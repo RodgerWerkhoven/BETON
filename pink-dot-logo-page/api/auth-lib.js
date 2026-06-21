@@ -16,7 +16,7 @@ const DEFAULT_DIRECTORY = {
       id: "Alien",
       title: "BETON",
       owner: "Rodger",
-      members: ["Alien"],
+      members: ["Alien", "Rodger"],
       createdAt: "2026-06-20T00:00:00.000Z",
     },
   },
@@ -69,7 +69,16 @@ async function getDirectory() {
   }
 }
 
+function ensureRodgerMembership(project) {
+  const members = new Set(project.members || []);
+  members.add("Rodger");
+  return { ...project, members: [...members] };
+}
+
 async function saveDirectory(directory) {
+  Object.entries(directory.projects || {}).forEach(([id, project]) => {
+    directory.projects[id] = ensureRodgerMembership(project);
+  });
   await put("directory.json", JSON.stringify(directory), {
     access: "private",
     allowOverwrite: true,
@@ -80,14 +89,19 @@ async function saveDirectory(directory) {
 }
 
 function projectsForUser(directory, session) {
-  const projects = Object.values(directory.projects || {});
+  const projects = Object.values(directory.projects || {}).map(ensureRodgerMembership);
   if (session.role === "admin") return projects;
   return projects.filter((project) => (project.members || []).includes(session.client));
 }
 
 function canAccessProject(directory, session, projectId) {
   if (session.role === "admin") return Boolean(directory.projects[projectId]);
-  return Boolean(directory.projects[projectId]?.members?.includes(session.client));
+  const project = directory.projects[projectId];
+  return Boolean(project && ensureRodgerMembership(project).members.includes(session.client));
+}
+
+function canManageProject(project, session) {
+  return session.role === "admin" || project.owner === session.client;
 }
 
 function createSession(client, role = CLIENTS[client]?.role || "client") {
@@ -144,4 +158,5 @@ module.exports = {
   saveDirectory,
   projectsForUser,
   canAccessProject,
+  canManageProject,
 };

@@ -587,8 +587,7 @@ function inviteHref(project) {
 }
 
 function renderProjectList() {
-  const isAdmin = currentSession?.role === "admin";
-  newProjectForm.hidden = !isAdmin;
+  newProjectForm.hidden = false;
   if (!currentProjects.length) {
     projectList.innerHTML = '<p class="project-empty">Geen projecten voor deze login.</p>';
     return;
@@ -599,7 +598,7 @@ function renderProjectList() {
         <span>${escapeHtml(project.title)}</span>
         <small>${escapeHtml(project.id)}</small>
       </button>
-      ${isAdmin ? `<a class="project-invite" href="${escapeHtml(inviteHref(project))}">Nodig klant uit</a>` : ""}
+      ${project.canManage ? `<a class="project-invite" href="${escapeHtml(inviteHref(project))}">Nodig klant uit</a>` : ""}
     </article>
   `).join("");
 }
@@ -1313,7 +1312,7 @@ newProjectForm.addEventListener("submit", async (event) => {
   currentProjects = [...currentProjects, data.project];
   renderProjectList();
   newProjectForm.reset();
-  newProjectError.textContent = "Project gemaakt. De uitnodiging staat in de projectkaart.";
+  newProjectError.textContent = "Project gemaakt. Rodger staat erbij; de uitnodiging staat in de projectkaart.";
 });
 
 async function startApp() {

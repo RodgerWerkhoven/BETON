@@ -1,4 +1,6 @@
-const { verifySession, getDirectory, saveDirectory, projectsForUser } = require("./auth-lib");
+const { verifySession, getDirectory, saveDirectory, projectsForUser, canManageProject } = require("./auth-lib");
+
+const RODGER_NOTIFY_EMAIL = process.env.RODGER_NOTIFY_EMAIL || "rodgerwerkhoven@gmail.com";
 
 async function readBody(req) {
   if (req.body && typeof req.body === "object") return req.body;
@@ -18,15 +20,73 @@ function slug(value) {
 }
 
 function publicProject(project, session) {
+  const canManage = canManageProject(project, session);
   return {
     id: project.id,
     title: project.title,
+    owner: project.owner || "",
     clientName: project.clientName || "",
     clientEmail: project.clientEmail || "",
-    clientPassword: session.role === "admin" ? project.clientPassword || "" : "",
+    clientPassword: canManage ? project.clientPassword || "" : "",
     members: project.members || [],
     createdAt: project.createdAt,
+    canManage,
   };
+}
+
+function appOrigin(req) {
+  const proto = req.headers["x-forwarded-proto"] || "https";
+  const host = req.headers["x-forwarded-host"] || req.headers.host || "localhost";
+  return `${proto}://${host}`;
+}
+
+function escapeHtml(value) {
+  return String(value || "").replace(/[&<>"']/g, (char) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]
+  ));
+}
+
+function projectUrl(req, project) {
+  return `${appOrigin(req)}/?project=${encodeURIComponent(project.id)}`;
+}
+
+async function sendRodgerProjectNotification(req, project, creator) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.warn(`Project notification skipped: RESEND_API_KEY missing for ${project.id}`);
+    return { sent: false, reason: "RESEND_API_KEY missing" };
+  }
+  const from = process.env.RESEND_FROM_EMAIL || "RODGER'S CONTENT CURATOR <onboarding@resend.dev>";
+  const url = projectUrl(req, project);
+  const subject = `Nieuwe rating page: ${project.title}`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.45; color: #111;">
+      <h1 style="font-size: 22px;">Nieuwe rating page aangemaakt</h1>
+      <p><strong>Project:</strong> ${escapeHtml(project.title)}</p>
+      <p><strong>Aangemaakt door:</strong> ${escapeHtml(creator.label || creator.client)}</p>
+      <p><strong>Genodigde:</strong> ${escapeHtml(project.clientName || "")}${project.clientEmail ? ` &lt;${escapeHtml(project.clientEmail)}&gt;` : ""}</p>
+      <p><strong>Project URL:</strong> <a href="${escapeHtml(url)}">${escapeHtml(url)}</a></p>
+    </div>
+  `;
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from,
+      to: [RODGER_NOTIFY_EMAIL],
+      subject,
+      html,
+    }),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    console.error("Project notification failed", body);
+    return { sent: false, reason: body.message || "Resend request failed" };
+  }
+  return { sent: true, id: body.id || "" };
 }
 
 module.exports = async function handler(req, res) {
@@ -44,7 +104,6 @@ module.exports = async function handler(req, res) {
     }
 
     if (req.method === "POST") {
-      if (session.role !== "admin") return res.status(403).json({ error: "Alleen Rodger kan projecten maken" });
       const body = await readBody(req);
       const title = String(body.title || "").trim();
       const clientName = String(body.clientName || "").trim();
@@ -65,6 +124,7 @@ module.exports = async function handler(req, res) {
         role: "client",
         email: clientEmail,
       };
+      const members = [...new Set([clientName, session.client, "Rodger"].filter(Boolean))];
       directory.projects[id] = {
         id,
         title,
@@ -72,11 +132,18 @@ module.exports = async function handler(req, res) {
         clientName,
         clientEmail,
         clientPassword,
-        members: [clientName],
+        members,
         createdAt: new Date().toISOString(),
       };
       await saveDirectory(directory);
-      return res.status(201).json({ project: publicProject(directory.projects[id], session) });
+      let notification;
+      try {
+        notification = await sendRodgerProjectNotification(req, directory.projects[id], session);
+      } catch (error) {
+        console.error("Project notification crashed", error);
+        notification = { sent: false, reason: error.message || "Notification failed" };
+      }
+      return res.status(201).json({ project: publicProject(directory.projects[id], session), notification });
     }
 
     res.setHeader("Allow", "GET, POST");

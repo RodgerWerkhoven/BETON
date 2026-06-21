@@ -255,10 +255,21 @@ function isPlayableMedia(logo) {
 }
 
 function mediaSource(logo) {
-  return logo.dataUrl || logoPath(logo.file);
+  if (logo.blobPathname) {
+    return `/api/media?project=${encodeURIComponent(activeProjectId)}&path=${encodeURIComponent(logo.blobPathname)}`;
+  }
+  return logo.url || logo.dataUrl || logoPath(logo.file);
 }
 
 function renderMediaStage(logo, safeName) {
+  if (logo.uploadError) {
+    return `
+      <div class="media-frame upload-error-frame">
+        <strong>${safeName}</strong>
+        <span>Upload mislukt</span>
+      </div>
+    `;
+  }
   const src = escapeHtml(mediaSource(logo));
   if (isVideoLogo(logo)) {
     return `
@@ -710,6 +721,37 @@ async function fileToStoredDataUrl(file) {
   return canvas.toDataURL("image/jpeg", 0.9);
 }
 
+function safeUploadName(file) {
+  return String(file.name || "upload")
+    .normalize("NFKD")
+    .replace(/[^\w.\-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 90) || "upload";
+}
+
+async function uploadMediaFile(file, id) {
+  const response = await fetch(`/api/upload-file?project=${encodeURIComponent(activeProjectId)}&name=${encodeURIComponent(`${id}-${safeUploadName(file)}`)}`, {
+    method: "POST",
+    headers: { "Content-Type": file.type || "application/octet-stream" },
+    body: file,
+  });
+  if (!response.ok) throw new Error(await response.text());
+  const result = await response.json();
+  return {
+    url: result.url,
+    blobPathname: result.blobPathname,
+  };
+}
+
+async function fileToStoredSource(file, id) {
+  if (file.type.startsWith("image/")) return { dataUrl: await fileToStoredDataUrl(file) };
+  if (file.type.startsWith("video/") || file.type.startsWith("audio/") || /\.(mov|mp4|m4v|mp3|aac|m4a)$/i.test(file.name)) {
+    return uploadMediaFile(file, id);
+  }
+  return { dataUrl: await fileToStoredDataUrl(file) };
+}
+
 async function addFiles(files) {
   let comment = document.querySelector("#newUploadComment")?.value.trim() || "";
   if (comment && !/^[RA]:\s/.test(comment)) comment = `${currentCommentPrefix()} ${comment}`;
@@ -717,6 +759,13 @@ async function addFiles(files) {
   const reviewPatch = {};
   for (const file of Array.from(files)) {
     const id = `added-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    let storedSource;
+    try {
+      storedSource = await fileToStoredSource(file, id);
+    } catch (error) {
+      console.error("Upload failed", error);
+      storedSource = { uploadError: true };
+    }
     const item = {
       id,
       file: id,
@@ -727,7 +776,7 @@ async function addFiles(files) {
       group: "TOEGEVOEGD",
       added: true,
       type: file.type || "application/octet-stream",
-      dataUrl: await fileToStoredDataUrl(file),
+      ...storedSource,
     };
     addedItems[id] = item;
     addedPatch[id] = item;

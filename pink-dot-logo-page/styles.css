@@ -529,7 +529,8 @@ main {
   grid-template-rows: 1fr auto auto;
 }
 
-.audio-frame strong {
+.audio-frame strong,
+.upload-error-frame strong {
   align-self: center;
   justify-self: center;
   max-width: 100%;
@@ -538,6 +539,22 @@ main {
   line-height: 1.2;
   overflow-wrap: anywhere;
   text-align: center;
+}
+
+.upload-error-frame {
+  align-content: center;
+  color: #ffffff;
+}
+
+.upload-error-frame span {
+  justify-self: center;
+  border: 1px solid #ffffff;
+  border-radius: 999px;
+  background: #f04438;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 900;
+  padding: 7px 10px;
 }
 
 .media-actions {

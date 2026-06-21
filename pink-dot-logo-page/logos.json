@@ -1,0 +1,363 @@
+[
+  {
+    "id": 1,
+    "file": "01_01_BETON_12_puzzle_logo_styles_202606201903.jpg",
+    "sourceIndex": 1,
+    "dotIndex": 1,
+    "source": "BETON 12 puzzle logo styles 202606201903",
+    "group": "BETON"
+  },
+  {
+    "id": 2,
+    "file": "02_01_BETON_12_puzzle_logo_styles_202606201904_1.jpg",
+    "sourceIndex": 2,
+    "dotIndex": 1,
+    "source": "BETON 12 puzzle logo styles 202606201904 (1)",
+    "group": "BETON",
+    "stateKey": "02_01_BETON_12_puzzle_logo_styles_202606201904 (1).jpg"
+  },
+  {
+    "id": 3,
+    "file": "02_02_BETON_12_puzzle_logo_styles_202606201904_1.jpg",
+    "sourceIndex": 2,
+    "dotIndex": 2,
+    "source": "BETON 12 puzzle logo styles 202606201904 (1)",
+    "group": "BETON",
+    "stateKey": "02_02_BETON_12_puzzle_logo_styles_202606201904 (1).jpg"
+  },
+  {
+    "id": 4,
+    "file": "03_01_BETON_12_puzzle_logo_styles_202606201904.jpg",
+    "sourceIndex": 3,
+    "dotIndex": 1,
+    "source": "BETON 12 puzzle logo styles 202606201904",
+    "group": "BETON"
+  },
+  {
+    "id": 5,
+    "file": "04_01_BETON_12_styles_brutalism_logo_202606201905_1.jpg",
+    "sourceIndex": 4,
+    "dotIndex": 1,
+    "source": "BETON 12 styles brutalism logo 202606201905 (1)",
+    "group": "BETON",
+    "stateKey": "04_01_BETON_12_styles_brutalism_logo_202606201905 (1).jpg"
+  },
+  {
+    "id": 6,
+    "file": "05_01_BETON_12_styles_brutalism_logo_202606201905_2.jpg",
+    "sourceIndex": 5,
+    "dotIndex": 1,
+    "source": "BETON 12 styles brutalism logo 202606201905 (2)",
+    "group": "BETON",
+    "stateKey": "05_01_BETON_12_styles_brutalism_logo_202606201905 (2).jpg"
+  },
+  {
+    "id": 7,
+    "file": "06_01_BETON_12_styles_brutalism_logo_202606201905.jpg",
+    "sourceIndex": 6,
+    "dotIndex": 1,
+    "source": "BETON 12 styles brutalism logo 202606201905",
+    "group": "BETON"
+  },
+  {
+    "id": 8,
+    "file": "06_02_BETON_12_styles_brutalism_logo_202606201905.jpg",
+    "sourceIndex": 6,
+    "dotIndex": 2,
+    "source": "BETON 12 styles brutalism logo 202606201905",
+    "group": "BETON"
+  },
+  {
+    "id": 9,
+    "file": "07_01_BETON_15_3D_brutalism_styles_202606201906_1.jpg",
+    "sourceIndex": 7,
+    "dotIndex": 1,
+    "source": "BETON 15 3D brutalism styles 202606201906 (1)",
+    "group": "BETON",
+    "stateKey": "07_01_BETON_15_3D_brutalism_styles_202606201906 (1).jpg"
+  },
+  {
+    "id": 10,
+    "file": "07_02_BETON_15_3D_brutalism_styles_202606201906_1.jpg",
+    "sourceIndex": 7,
+    "dotIndex": 2,
+    "source": "BETON 15 3D brutalism styles 202606201906 (1)",
+    "group": "BETON",
+    "stateKey": "07_02_BETON_15_3D_brutalism_styles_202606201906 (1).jpg"
+  },
+  {
+    "id": 11,
+    "file": "07_03_BETON_15_3D_brutalism_styles_202606201906_1.jpg",
+    "sourceIndex": 7,
+    "dotIndex": 3,
+    "source": "BETON 15 3D brutalism styles 202606201906 (1)",
+    "group": "BETON",
+    "stateKey": "07_03_BETON_15_3D_brutalism_styles_202606201906 (1).jpg"
+  },
+  {
+    "id": 12,
+    "file": "08_01_BETON_15_3D_brutalism_styles_202606201906_2.jpg",
+    "sourceIndex": 8,
+    "dotIndex": 1,
+    "source": "BETON 15 3D brutalism styles 202606201906 (2)",
+    "group": "BETON",
+    "stateKey": "08_01_BETON_15_3D_brutalism_styles_202606201906 (2).jpg"
+  },
+  {
+    "id": 13,
+    "file": "08_02_BETON_15_3D_brutalism_styles_202606201906_2.jpg",
+    "sourceIndex": 8,
+    "dotIndex": 2,
+    "source": "BETON 15 3D brutalism styles 202606201906 (2)",
+    "group": "BETON",
+    "stateKey": "08_02_BETON_15_3D_brutalism_styles_202606201906 (2).jpg"
+  },
+  {
+    "id": 14,
+    "file": "08_03_BETON_15_3D_brutalism_styles_202606201906_2.jpg",
+    "sourceIndex": 8,
+    "dotIndex": 3,
+    "source": "BETON 15 3D brutalism styles 202606201906 (2)",
+    "group": "BETON",
+    "stateKey": "08_03_BETON_15_3D_brutalism_styles_202606201906 (2).jpg"
+  },
+  {
+    "id": 15,
+    "file": "09_01_BETON_15_3D_brutalism_styles_202606201906.jpg",
+    "sourceIndex": 9,
+    "dotIndex": 1,
+    "source": "BETON 15 3D brutalism styles 202606201906",
+    "group": "BETON"
+  },
+  {
+    "id": 16,
+    "file": "09_02_BETON_15_3D_brutalism_styles_202606201906.jpg",
+    "sourceIndex": 9,
+    "dotIndex": 2,
+    "source": "BETON 15 3D brutalism styles 202606201906",
+    "group": "BETON"
+  },
+  {
+    "id": 17,
+    "file": "09_03_BETON_15_3D_brutalism_styles_202606201906.jpg",
+    "sourceIndex": 9,
+    "dotIndex": 3,
+    "source": "BETON 15 3D brutalism styles 202606201906",
+    "group": "BETON"
+  },
+  {
+    "id": 18,
+    "file": "09_04_BETON_15_3D_brutalism_styles_202606201906.jpg",
+    "sourceIndex": 9,
+    "dotIndex": 4,
+    "source": "BETON 15 3D brutalism styles 202606201906",
+    "group": "BETON"
+  },
+  {
+    "id": 19,
+    "file": "09_05_BETON_15_3D_brutalism_styles_202606201906.jpg",
+    "sourceIndex": 9,
+    "dotIndex": 5,
+    "source": "BETON 15 3D brutalism styles 202606201906",
+    "group": "BETON"
+  },
+  {
+    "id": 20,
+    "file": "11_01_BETON_15_Bauhaus_logo_styles_202606201909.jpg",
+    "sourceIndex": 11,
+    "dotIndex": 1,
+    "source": "BETON 15 Bauhaus logo styles 202606201909",
+    "group": "BETON"
+  },
+  {
+    "id": 21,
+    "file": "12_01_BETON_15_different_styles_202606201910.jpg",
+    "sourceIndex": 12,
+    "dotIndex": 1,
+    "source": "BETON 15 different styles 202606201910",
+    "group": "BETON"
+  },
+  {
+    "id": 22,
+    "file": "13_01_BETON_15_different_styles_202606201911.jpg",
+    "sourceIndex": 13,
+    "dotIndex": 1,
+    "source": "BETON 15 different styles 202606201911",
+    "group": "BETON"
+  },
+  {
+    "id": 23,
+    "file": "14_01_BETON_15_styles_brutalism_logo_202606201907.jpg",
+    "sourceIndex": 14,
+    "dotIndex": 1,
+    "source": "BETON 15 styles brutalism logo 202606201907",
+    "group": "BETON"
+  },
+  {
+    "id": 24,
+    "file": "14_02_BETON_15_styles_brutalism_logo_202606201907.jpg",
+    "sourceIndex": 14,
+    "dotIndex": 2,
+    "source": "BETON 15 styles brutalism logo 202606201907",
+    "group": "BETON"
+  },
+  {
+    "id": 25,
+    "file": "15_01_BETON_WODKA_12_logo_styles_202606201902.jpg",
+    "sourceIndex": 15,
+    "dotIndex": 1,
+    "source": "BETON WODKA 12 logo styles 202606201902",
+    "group": "BETON WODKA"
+  },
+  {
+    "id": 26,
+    "file": "16_01_BETON_WODKA_12_logo_styles_202606201903.jpg",
+    "sourceIndex": 16,
+    "dotIndex": 1,
+    "source": "BETON WODKA 12 logo styles 202606201903",
+    "group": "BETON WODKA"
+  },
+  {
+    "id": 27,
+    "file": "17_01_BETON_WODKA_brutalist_logo_styles_202606201859_1.jpg",
+    "sourceIndex": 17,
+    "dotIndex": 1,
+    "source": "BETON WODKA brutalist logo styles 202606201859 (1)",
+    "group": "BETON WODKA",
+    "stateKey": "17_01_BETON_WODKA_brutalist_logo_styles_202606201859 (1).jpg"
+  },
+  {
+    "id": 28,
+    "file": "18_01_BETON_WODKA_brutalist_logo_styles_202606201859.jpg",
+    "sourceIndex": 18,
+    "dotIndex": 1,
+    "source": "BETON WODKA brutalist logo styles 202606201859",
+    "group": "BETON WODKA"
+  },
+  {
+    "id": 29,
+    "file": "19_01_BETON_WODKA_brutalist_logo_styles_202606201900_1.jpg",
+    "sourceIndex": 19,
+    "dotIndex": 1,
+    "source": "BETON WODKA brutalist logo styles 202606201900 (1)",
+    "group": "BETON WODKA",
+    "stateKey": "19_01_BETON_WODKA_brutalist_logo_styles_202606201900 (1).jpg"
+  },
+  {
+    "id": 30,
+    "file": "19_02_BETON_WODKA_brutalist_logo_styles_202606201900_1.jpg",
+    "sourceIndex": 19,
+    "dotIndex": 2,
+    "source": "BETON WODKA brutalist logo styles 202606201900 (1)",
+    "group": "BETON WODKA",
+    "stateKey": "19_02_BETON_WODKA_brutalist_logo_styles_202606201900 (1).jpg"
+  },
+  {
+    "id": 31,
+    "file": "19_03_BETON_WODKA_brutalist_logo_styles_202606201900_1.jpg",
+    "sourceIndex": 19,
+    "dotIndex": 3,
+    "source": "BETON WODKA brutalist logo styles 202606201900 (1)",
+    "group": "BETON WODKA",
+    "stateKey": "19_03_BETON_WODKA_brutalist_logo_styles_202606201900 (1).jpg"
+  },
+  {
+    "id": 32,
+    "file": "19_04_BETON_WODKA_brutalist_logo_styles_202606201900_1.jpg",
+    "sourceIndex": 19,
+    "dotIndex": 4,
+    "source": "BETON WODKA brutalist logo styles 202606201900 (1)",
+    "group": "BETON WODKA",
+    "stateKey": "19_04_BETON_WODKA_brutalist_logo_styles_202606201900 (1).jpg"
+  },
+  {
+    "id": 33,
+    "file": "19_05_BETON_WODKA_brutalist_logo_styles_202606201900_1.jpg",
+    "sourceIndex": 19,
+    "dotIndex": 5,
+    "source": "BETON WODKA brutalist logo styles 202606201900 (1)",
+    "group": "BETON WODKA",
+    "stateKey": "19_05_BETON_WODKA_brutalist_logo_styles_202606201900 (1).jpg"
+  },
+  {
+    "id": 34,
+    "file": "20_01_BETON_WODKA_brutalist_logo_styles_202606201900.jpg",
+    "sourceIndex": 20,
+    "dotIndex": 1,
+    "source": "BETON WODKA brutalist logo styles 202606201900",
+    "group": "BETON WODKA"
+  },
+  {
+    "id": 35,
+    "file": "20_02_BETON_WODKA_brutalist_logo_styles_202606201900.jpg",
+    "sourceIndex": 20,
+    "dotIndex": 2,
+    "source": "BETON WODKA brutalist logo styles 202606201900",
+    "group": "BETON WODKA"
+  },
+  {
+    "id": 36,
+    "file": "21_01_BETON_WODKA_logo_styles_202606201859.jpg",
+    "sourceIndex": 21,
+    "dotIndex": 1,
+    "source": "BETON WODKA logo styles 202606201859",
+    "group": "BETON WODKA"
+  },
+  {
+    "id": 37,
+    "file": "22_01_BETON_WODKA_logo_styles_202606201901.jpg",
+    "sourceIndex": 22,
+    "dotIndex": 1,
+    "source": "BETON WODKA logo styles 202606201901",
+    "group": "BETON WODKA"
+  },
+  {
+    "id": 38,
+    "file": "25_01_BETON_logo_styles_black_white_202606201833.jpg",
+    "sourceIndex": 25,
+    "dotIndex": 1,
+    "source": "BETON logo styles black white 202606201833",
+    "group": "BETON"
+  },
+  {
+    "id": 39,
+    "file": "29_01_BETON_logo_styles_brutalism_black_202606201837_2.jpg",
+    "sourceIndex": 29,
+    "dotIndex": 1,
+    "source": "BETON logo styles brutalism black 202606201837 (2)",
+    "group": "BETON",
+    "stateKey": "29_01_BETON_logo_styles_brutalism_black_202606201837 (2).jpg"
+  },
+  {
+    "id": 40,
+    "file": "30_01_BETON_logo_styles_brutalism_black_202606201837.jpg",
+    "sourceIndex": 30,
+    "dotIndex": 1,
+    "source": "BETON logo styles brutalism black 202606201837",
+    "group": "BETON"
+  },
+  {
+    "id": 41,
+    "file": "31_01_BETON_logo_styles_brutalism_black_202606201907.jpg",
+    "sourceIndex": 31,
+    "dotIndex": 1,
+    "source": "BETON logo styles brutalism black 202606201907",
+    "group": "BETON"
+  },
+  {
+    "id": 42,
+    "file": "31_02_BETON_logo_styles_brutalism_black_202606201907.jpg",
+    "sourceIndex": 31,
+    "dotIndex": 2,
+    "source": "BETON logo styles brutalism black 202606201907",
+    "group": "BETON"
+  },
+  {
+    "id": 43,
+    "file": "32_01_BETON_logo_styles_brutalism_black_202606201908.jpg",
+    "sourceIndex": 32,
+    "dotIndex": 1,
+    "source": "BETON logo styles brutalism black 202606201908",
+    "group": "BETON"
+  }
+]

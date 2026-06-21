@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BETON images review</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <section id="loginView" class="login-view" hidden>
+      <form id="loginForm" class="login-panel">
+        <p class="eyebrow">BETON klantlogin</p>
+        <h1>Images review</h1>
+        <label>
+          <span>Naam</span>
+          <input id="loginName" name="name" autocomplete="username" required />
+        </label>
+        <label>
+          <span>Wachtwoord</span>
+          <input id="loginPassword" name="password" type="password" autocomplete="current-password" required />
+        </label>
+        <button type="submit">Login</button>
+        <p id="loginError" class="login-error" role="alert"></p>
+      </form>
+    </section>
+
+    <div id="appView" hidden>
+    <header class="topbar">
+      <div class="title-block">
+        <p class="eyebrow">BETON images selectie</p>
+        <div class="title-row">
+          <h1 data-edit-key="title">Images review</h1>
+          <section class="text-tools" aria-label="Naam bewerken">
+            <button id="toggleTextEdit" type="button">Naam wijzigen</button>
+            <button id="saveTextEdit" type="button" hidden>Naam opslaan</button>
+            <button id="resetTextEdit" type="button" hidden>Naam resetten</button>
+          </section>
+        </div>
+      </div>
+      <div class="top-actions">
+        <div class="count"><span id="count">43</span> images</div>
+        <button class="status-filter" id="addedFilter" type="button" data-filter="TOEGEVOEGD">Toegevoegd</button>
+        <button class="status-filter" id="deletedFilter" type="button" data-filter="deleted">Verwijderd</button>
+        <button id="logoutButton" type="button">Uitloggen</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="controls" aria-label="Filter">
+        <button class="filter active" data-filter="all">TAGS</button>
+      </section>
+
+      <input id="addFileInput" type="file" multiple hidden />
+      <section id="gallery" class="gallery" aria-label="Images galerij"></section>
+    </main>
+
+    <dialog id="cropDialog" class="crop-dialog">
+      <form method="dialog">
+        <button class="close" aria-label="Sluiten">×</button>
+      </form>
+      <div class="crop-head">
+        <div>
+          <p class="eyebrow" id="cropGroup">BETON</p>
+          <h2 id="cropTitle">#01</h2>
+        </div>
+        <div class="crop-actions">
+          <button id="aspectFree" type="button" class="active">Vrij</button>
+          <button id="aspectGrid" type="button">Grid</button>
+          <button id="aspectSquare" type="button">1:1</button>
+        </div>
+      </div>
+      <div class="crop-stage-wrap">
+        <canvas id="cropCanvas" width="1000" height="680"></canvas>
+      </div>
+      <div class="crop-footer">
+        <button id="undoCrop" type="button">↩️ Undo crop</button>
+        <button id="resetCrop" type="button">Reset crop</button>
+        <button id="downloadCrop" type="button">Download crop</button>
+        <button id="saveCrop" type="button">Opslaan in grid</button>
+      </div>
+      <p id="cropMeta" class="crop-meta"></p>
+    </dialog>
+    </div>
+
+    <script src="/script.js"></script>
+  </body>
+</html>

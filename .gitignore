@@ -1,0 +1,8 @@
+.DS_Store
+node_modules/
+.env*.local
+.vercel/
+pink-dot-logo-page/mobile-*.png
+pink-dot-logo-page/live-mobile-*.png
+pink-dot-logo-page/proof-*.png
+pink-dot-logo-page/backups/

@@ -64,6 +64,7 @@ body {
 .login-panel button,
 #logoutButton,
 #projectLogoutButton,
+#projectOverviewButton,
 .new-project-form button,
 .project-open,
 .project-invite {
@@ -352,6 +353,7 @@ main {
 .project-open:focus-visible,
 .project-invite:focus-visible,
 #projectLogoutButton:focus-visible,
+#projectOverviewButton:focus-visible,
 .new-project-form button:focus-visible,
 .comment textarea:focus-visible,
 .filter:focus-visible,
@@ -987,6 +989,7 @@ main {
   .vote-filters,
   .count,
   .status-filter,
+  #projectOverviewButton,
   #logoutButton {
     width: 100%;
   }

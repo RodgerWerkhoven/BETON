@@ -17,6 +17,7 @@ const DEFAULT_DIRECTORY = {
       title: "BETON",
       owner: "Rodger",
       members: ["Alien", "Rodger"],
+      baseAssets: true,
       createdAt: "2026-06-20T00:00:00.000Z",
     },
   },

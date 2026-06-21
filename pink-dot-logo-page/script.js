@@ -7,6 +7,7 @@ const loginPassword = document.querySelector("#loginPassword");
 const loginError = document.querySelector("#loginError");
 const logoutButton = document.querySelector("#logoutButton");
 const projectLogoutButton = document.querySelector("#projectLogoutButton");
+const projectOverviewButton = document.querySelector("#projectOverviewButton");
 const projectList = document.querySelector("#projectList");
 const newProjectForm = document.querySelector("#newProjectForm");
 const newProjectTitle = document.querySelector("#newProjectTitle");
@@ -620,6 +621,15 @@ async function showProjectOverview() {
     console.error("Project load failed", error);
     showLogin("Log opnieuw in.");
   }
+}
+
+async function returnToProjectOverview() {
+  stopMedia(document);
+  if (lightboxDialog.open) closeLightbox();
+  if (cropDialog.open) cropDialog.close();
+  if (Object.keys(pendingPatch).length) await persistNow({});
+  activeProject = null;
+  await showProjectOverview();
 }
 
 async function openProject(projectId) {
@@ -1318,8 +1328,12 @@ newProjectForm.addEventListener("submit", async (event) => {
 async function startApp() {
   showApp();
   applySavedText();
-  const response = await fetch("/logos.json");
-  logos = await response.json();
+  if (activeProject?.baseAssets) {
+    const response = await fetch("/logos.json");
+    logos = await response.json();
+  } else {
+    logos = [];
+  }
   await loadSharedState();
   setProjectTitleFallback();
   render();
@@ -1352,6 +1366,7 @@ async function logout() {
 
 logoutButton.addEventListener("click", logout);
 projectLogoutButton.addEventListener("click", logout);
+projectOverviewButton.addEventListener("click", returnToProjectOverview);
 
 (async () => {
   const response = await fetch("/api/session", { cache: "no-store" });

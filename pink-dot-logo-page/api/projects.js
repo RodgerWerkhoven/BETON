@@ -31,6 +31,7 @@ function publicProject(project, session) {
     members: project.members || [],
     createdAt: project.createdAt,
     canManage,
+    baseAssets: project.baseAssets === true || project.id === "Alien",
   };
 }
 
@@ -133,6 +134,7 @@ module.exports = async function handler(req, res) {
         clientEmail,
         clientPassword,
         members,
+        baseAssets: false,
         createdAt: new Date().toISOString(),
       };
       await saveDirectory(directory);

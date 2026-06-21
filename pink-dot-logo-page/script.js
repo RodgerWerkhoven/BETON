@@ -36,6 +36,7 @@ const cropHistoryStoreKey = "beton-logo-crop-history-v1";
 const reviewStoreKey = "beton-logo-review-state-v1";
 const addedItemsStoreKey = "beton-logo-added-items-v1";
 const textStoreKey = "beton-logo-page-text-v1";
+const ratingOptions = ["🤩", "🙂", "🆗", "🤔", "🤮"];
 const defaults = Object.fromEntries(editableTextNodes.map((node) => [node.dataset.editKey, node.textContent]));
 const activeClient = new URLSearchParams(window.location.search).get("client") || "Alien";
 
@@ -250,11 +251,18 @@ function tagsFor(logo, review) {
   return review.customTags ? uniqueTags(review.customTags) : inferredTags(logo);
 }
 
+function isTagFiltered() {
+  return !["all", "TOEGEVOEGD", "deleted"].includes(activeFilter);
+}
+
 function renderTags(logo, review) {
   const tags = tagsFor(logo, review);
+  const allTag = isTagFiltered()
+    ? `<button class="tag tag-all" type="button" data-tag-filter="all">#ALL</button>`
+    : "";
   return `
     <div class="tag-row">
-      <div class="tags">${tags.map((tag) => `<span class="tag">${escapeHtml(tagLabel(tag))}</span>`).join("")}</div>
+      <div class="tags">${allTag}${tags.map((tag) => `<button class="tag" type="button" data-tag-filter="${escapeHtml(tag)}">${escapeHtml(tagLabel(tag))}</button>`).join("")}</div>
       <button class="tag-edit" type="button" data-action="tag-edit" data-id="${logo.id}" aria-label="Tags aanpassen">#</button>
     </div>
   `;
@@ -369,7 +377,7 @@ function render() {
             </div>
             <div class="source">${logo.added ? `Toegevoegd: ${safeSource}` : `Bron ${logo.sourceIndex}.${logo.dotIndex}: ${safeSource}`}</div>
             <div class="rating" role="group" aria-label="Rating voor image ${logo.id}">
-              ${["🤩", "🆗", "🤮"].map((rating) => {
+              ${ratingOptions.map((rating) => {
                 const ratings = ratingsFor(review);
                 return `
                 <button
@@ -777,6 +785,11 @@ gallery.addEventListener("click", (event) => {
     const uploadComment = document.querySelector("#newUploadComment");
     if (uploadComment && !uploadComment.value) uploadComment.value = `${currentCommentPrefix()} `;
     uploadComment?.focus();
+    return;
+  }
+  const tagFilter = event.target.closest("[data-tag-filter]");
+  if (tagFilter) {
+    setActiveFilter(tagFilter.dataset.tagFilter);
     return;
   }
   const action = event.target.closest("[data-action]");

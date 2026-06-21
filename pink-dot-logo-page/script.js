@@ -747,8 +747,16 @@ async function uploadMediaFile(file, id) {
   const result = await uploadResponse.json();
   return {
     url: result.url,
-    blobPathname: result.pathname || ticket.pathname,
+    blobPathname: result.pathname || blobPathnameFromUrl(result.url) || ticket.pathname,
   };
+}
+
+function blobPathnameFromUrl(url) {
+  try {
+    return decodeURIComponent(new URL(url).pathname.replace(/^\/+/, ""));
+  } catch {
+    return "";
+  }
 }
 
 async function fileToStoredSource(file, id) {

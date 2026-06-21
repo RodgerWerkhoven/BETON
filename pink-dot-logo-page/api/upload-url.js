@@ -59,7 +59,6 @@ module.exports = async function handler(req, res) {
       access: "private",
       allowedContentTypes: allowedContentTypes(),
       maximumSizeInBytes,
-      addRandomSuffix: true,
     });
     return res.status(200).json({ presignedUrl, pathname, contentType: type });
   } catch (error) {

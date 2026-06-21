@@ -10,6 +10,8 @@ const count = document.querySelector("#count");
 const controls = document.querySelector(".controls");
 const addedFilter = document.querySelector("#addedFilter");
 const deletedFilter = document.querySelector("#deletedFilter");
+const clientVoteFilter = document.querySelector("#clientVoteFilter");
+const adminVoteFilter = document.querySelector("#adminVoteFilter");
 const cropDialog = document.querySelector("#cropDialog");
 const cropCanvas = document.querySelector("#cropCanvas");
 const cropContext = cropCanvas.getContext("2d");
@@ -206,6 +208,8 @@ function visibleLogos() {
   if (activeFilter === "deleted") return list.filter((logo) => reviewState[logoStateKey(logo)]?.deleted);
   const active = list.filter((logo) => !reviewState[logoStateKey(logo)]?.deleted);
   if (activeFilter === "TOEGEVOEGD") return active.filter((logo) => logo.group === "TOEGEVOEGD" || logo.group === "ADDED");
+  if (activeFilter === "vote-client") return active.filter((logo) => hasVote(logo, "client"));
+  if (activeFilter === "vote-admin") return active.filter((logo) => hasVote(logo, "admin"));
   if (activeFilter === "all") return active;
   return active.filter((logo) => tagsFor(logo, logoReview(logo)).includes(activeFilter));
 }
@@ -220,6 +224,10 @@ function currentRatingRole() {
 
 function ratingsFor(review) {
   return review.ratings || (review.rating ? { client: review.rating } : {});
+}
+
+function hasVote(logo, role) {
+  return Boolean(ratingsFor(logoReview(logo))[role]);
 }
 
 function normalizeTag(tag) {
@@ -252,7 +260,7 @@ function tagsFor(logo, review) {
 }
 
 function isTagFiltered() {
-  return !["all", "TOEGEVOEGD", "deleted"].includes(activeFilter);
+  return !["all", "TOEGEVOEGD", "deleted", "vote-client", "vote-admin"].includes(activeFilter);
 }
 
 function renderTags(logo, review) {
@@ -284,6 +292,8 @@ function renderFilters() {
   controls.innerHTML = `<button class="filter ${activeFilter === "all" ? "active" : ""}" data-filter="all">TAGS</button>${tagButtons.join("")}`;
   addedFilter.classList.toggle("active", activeFilter === "TOEGEVOEGD");
   deletedFilter.classList.toggle("active", activeFilter === "deleted");
+  clientVoteFilter.classList.toggle("active", activeFilter === "vote-client");
+  adminVoteFilter.classList.toggle("active", activeFilter === "vote-admin");
 }
 
 function currentCommentPrefix() {
@@ -769,7 +779,7 @@ controls.addEventListener("click", (event) => {
   setActiveFilter(button.dataset.filter);
 });
 
-[addedFilter, deletedFilter].forEach((button) => {
+[addedFilter, deletedFilter, clientVoteFilter, adminVoteFilter].forEach((button) => {
   button.addEventListener("click", () => {
     setActiveFilter(activeFilter === button.dataset.filter ? "all" : button.dataset.filter);
   });

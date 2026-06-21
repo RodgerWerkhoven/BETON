@@ -100,6 +100,49 @@ body {
   min-width: 0;
 }
 
+.vote-filters {
+  display: grid;
+  flex: 0 0 auto;
+  justify-items: center;
+  gap: 5px;
+  margin-inline: auto;
+}
+
+.vote-buttons {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.vote-filter {
+  width: 58px;
+  height: 58px;
+  border: 2px solid var(--dark);
+  border-radius: 999px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.vote-filter-client {
+  background: #60d46f;
+}
+
+.vote-filter-admin {
+  background: var(--accent);
+}
+
+.vote-filter.active {
+  box-shadow: 0 0 0 5px var(--dark);
+}
+
+.vote-label {
+  color: var(--dark);
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
 .title-row {
   display: flex;
   min-width: 0;
@@ -172,6 +215,7 @@ main {
 
 .text-tools button:focus-visible,
 .status-filter:focus-visible,
+.vote-filter:focus-visible,
 .crop-actions button:focus-visible,
 .crop-footer button:focus-visible,
 .edit-logo:focus-visible,
@@ -648,6 +692,7 @@ main {
   }
 
   .top-actions,
+  .vote-filters,
   .count,
   .status-filter,
   #logoutButton {
@@ -662,6 +707,10 @@ main {
   .top-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .vote-filters {
+    width: 100%;
   }
 
   .gallery {

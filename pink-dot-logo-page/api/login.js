@@ -1,4 +1,4 @@
-const { CLIENTS, createSession, sessionCookie } = require("./auth-lib");
+const { getDirectory, createSession, sessionCookie } = require("./auth-lib");
 
 async function readBody(req) {
   if (req.body && typeof req.body === "object") return req.body;
@@ -11,8 +11,9 @@ async function readBody(req) {
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
   const { name, password } = await readBody(req);
-  const client = CLIENTS[name];
+  const directory = await getDirectory();
+  const client = directory.users[name];
   if (!client || client.password !== password) return res.status(401).json({ error: "Login mislukt" });
-  res.setHeader("Set-Cookie", sessionCookie(createSession(name)));
-  return res.status(200).json({ client: name, label: client.label, role: client.role });
+  res.setHeader("Set-Cookie", sessionCookie(createSession(name, client.role)));
+  return res.status(200).json({ client: name, label: client.label || name, role: client.role });
 };

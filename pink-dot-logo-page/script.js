@@ -1,10 +1,19 @@
 const loginView = document.querySelector("#loginView");
+const projectView = document.querySelector("#projectView");
 const appView = document.querySelector("#appView");
 const loginForm = document.querySelector("#loginForm");
 const loginName = document.querySelector("#loginName");
 const loginPassword = document.querySelector("#loginPassword");
 const loginError = document.querySelector("#loginError");
 const logoutButton = document.querySelector("#logoutButton");
+const projectLogoutButton = document.querySelector("#projectLogoutButton");
+const projectList = document.querySelector("#projectList");
+const newProjectForm = document.querySelector("#newProjectForm");
+const newProjectTitle = document.querySelector("#newProjectTitle");
+const newProjectClient = document.querySelector("#newProjectClient");
+const newProjectEmail = document.querySelector("#newProjectEmail");
+const newProjectPassword = document.querySelector("#newProjectPassword");
+const newProjectError = document.querySelector("#newProjectError");
 const gallery = document.querySelector("#gallery");
 const count = document.querySelector("#count");
 const controls = document.querySelector(".controls");
@@ -32,6 +41,9 @@ const saveTextEdit = document.querySelector("#saveTextEdit");
 const resetTextEdit = document.querySelector("#resetTextEdit");
 const addFileInput = document.querySelector("#addFileInput");
 const editableTextNodes = Array.from(document.querySelectorAll("[data-edit-key]"));
+const lightboxDialog = document.querySelector("#lightboxDialog");
+const lightboxImage = document.querySelector("#lightboxImage");
+const lightboxClose = document.querySelector("#lightboxClose");
 
 const cropStoreKey = "beton-logo-crops-v2";
 const cropHistoryStoreKey = "beton-logo-crop-history-v1";
@@ -40,7 +52,7 @@ const addedItemsStoreKey = "beton-logo-added-items-v1";
 const textStoreKey = "beton-logo-page-text-v1";
 const ratingOptions = ["🤩", "🙂", "🆗", "🤔", "🤮"];
 const defaults = Object.fromEntries(editableTextNodes.map((node) => [node.dataset.editKey, node.textContent]));
-const activeClient = new URLSearchParams(window.location.search).get("client") || "Alien";
+let activeProjectId = new URLSearchParams(window.location.search).get("project") || "Alien";
 
 let logos = [];
 let cropOverrides = readJson(cropStoreKey, {});
@@ -57,16 +69,26 @@ let pointer = null;
 let pendingPatch = {};
 let persistTimer = null;
 let currentSession = null;
+let currentProjects = [];
+let activeProject = null;
 
 function showLogin(message = "") {
   loginView.hidden = false;
+  projectView.hidden = true;
   appView.hidden = true;
   loginError.textContent = message;
   loginName.focus();
 }
 
+function showProjects() {
+  loginView.hidden = true;
+  projectView.hidden = false;
+  appView.hidden = true;
+}
+
 function showApp() {
   loginView.hidden = true;
+  projectView.hidden = true;
   appView.hidden = false;
 }
 
@@ -76,6 +98,15 @@ function readJson(key, fallback) {
   } catch {
     return fallback;
   }
+}
+
+function setProjectTitleFallback() {
+  if (!activeProject) return;
+  const saved = readJson(textStoreKey, {});
+  if (saved.title) return;
+  editableTextNodes.forEach((node) => {
+    if (node.dataset.editKey === "title") node.textContent = activeProject.title;
+  });
 }
 
 function writeJson(key, value) {
@@ -126,7 +157,7 @@ async function persistNow(patch) {
   const toSend = pendingPatch;
   pendingPatch = {};
   try {
-    const response = await fetch(`/api/state?client=${encodeURIComponent(activeClient)}`, {
+    const response = await fetch(`/api/state?project=${encodeURIComponent(activeProjectId)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(toSend),
@@ -148,15 +179,17 @@ function schedulePersist(patch) {
 
 async function loadSharedState() {
   try {
-    const response = await fetch(`/api/state?client=${encodeURIComponent(activeClient)}`, { cache: "no-store" });
+    const response = await fetch(`/api/state?project=${encodeURIComponent(activeProjectId)}`, { cache: "no-store" });
     if (!response.ok) throw new Error(await response.text());
     const remote = await response.json();
     const local = localSnapshot();
     if (hasState(remote)) {
       applyState(remote);
-    } else if (hasState(local)) {
+    } else if (activeProjectId === "Alien" && hasState(local)) {
       applyState(local);
       await persistNow(local);
+    } else {
+      applyState(remote);
     }
   } catch (error) {
     if (String(error.message || "").includes("401")) {
@@ -468,6 +501,85 @@ function setTextEditMode(enabled) {
 
 function currentTextValues() {
   return Object.fromEntries(editableTextNodes.map((node) => [node.dataset.editKey, node.textContent.trim()]));
+}
+
+function inviteUrl(project) {
+  return `${window.location.origin}${window.location.pathname}?project=${encodeURIComponent(project.id)}`;
+}
+
+function inviteHref(project) {
+  const subject = `Uitnodiging voor ${project.title}`;
+  const body = [
+    `Je kunt inloggen op de rating page voor ${project.title}:`,
+    inviteUrl(project),
+    "",
+    `Naam: ${project.clientName || ""}`,
+    `Wachtwoord: ${project.clientPassword || ""}`,
+  ].join("\n");
+  return `mailto:${encodeURIComponent(project.clientEmail || "")}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+function renderProjectList() {
+  const isAdmin = currentSession?.role === "admin";
+  newProjectForm.hidden = !isAdmin;
+  if (!currentProjects.length) {
+    projectList.innerHTML = '<p class="project-empty">Geen projecten voor deze login.</p>';
+    return;
+  }
+  projectList.innerHTML = currentProjects.map((project) => `
+    <article class="project-card">
+      <button class="project-open" type="button" data-project-id="${escapeHtml(project.id)}">
+        <span>${escapeHtml(project.title)}</span>
+        <small>${escapeHtml(project.id)}</small>
+      </button>
+      ${isAdmin ? `<a class="project-invite" href="${escapeHtml(inviteHref(project))}">Nodig klant uit</a>` : ""}
+    </article>
+  `).join("");
+}
+
+async function loadProjects() {
+  const response = await fetch("/api/projects", { cache: "no-store" });
+  if (!response.ok) throw new Error(await response.text());
+  const data = await response.json();
+  currentProjects = data.projects || [];
+  currentSession = data.session || currentSession;
+  renderProjectList();
+}
+
+async function showProjectOverview() {
+  showProjects();
+  try {
+    await loadProjects();
+  } catch (error) {
+    console.error("Project load failed", error);
+    showLogin("Log opnieuw in.");
+  }
+}
+
+async function openProject(projectId) {
+  const project = currentProjects.find((item) => item.id === projectId);
+  if (!project) return;
+  activeProject = project;
+  activeProjectId = project.id;
+  activeFilter = "all";
+  pendingPatch = {};
+  clearTimeout(persistTimer);
+  editableTextNodes.forEach((node) => {
+    if (node.dataset.editKey === "title") node.textContent = project.title;
+  });
+  await startApp();
+}
+
+function openLightbox(logo) {
+  if (!logo || !isImageLogo(logo)) return;
+  lightboxImage.src = imageSource(logo);
+  lightboxImage.dataset.fallback = imageFallbackSource(logo);
+  lightboxImage.alt = logo.name || `Image ${logo.id}`;
+  lightboxDialog.showModal();
+}
+
+function closeLightbox() {
+  if (lightboxDialog.open) lightboxDialog.close();
 }
 
 function findLogo(id) {
@@ -856,19 +968,35 @@ gallery.addEventListener("click", (event) => {
     }
     return;
   }
-  const control = event.target.closest("[data-id]");
-  if (!control) return;
-  const logo = findLogo(control.dataset.id);
+  const imageButton = event.target.closest(".image-button[data-id]");
+  if (imageButton) {
+    const logo = findLogo(imageButton.dataset.id);
+    if (logo) openLightbox(logo);
+    return;
+  }
+  const cropControl = event.target.closest(".edit-logo[data-id]");
+  if (!cropControl) return;
+  const logo = findLogo(cropControl.dataset.id);
   if (logo) openCropper(logo);
 });
 
-gallery.addEventListener("error", (event) => {
+function imageFallbackHandler(event) {
   const image = event.target;
   if (!(image instanceof HTMLImageElement)) return;
   const fallback = image.dataset.fallback;
   if (!fallback || image.src.endsWith(fallback)) return;
   image.src = fallback;
-}, true);
+}
+
+gallery.addEventListener("error", imageFallbackHandler, true);
+lightboxImage.addEventListener("error", imageFallbackHandler);
+
+lightboxDialog.addEventListener("click", closeLightbox);
+lightboxImage.addEventListener("click", closeLightbox);
+lightboxClose.addEventListener("click", closeLightbox);
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeLightbox();
+});
 
 gallery.addEventListener("input", (event) => {
   const control = event.target.closest('[data-action="comment"]');
@@ -993,12 +1121,44 @@ resetTextEdit.addEventListener("click", () => {
   setTextEditMode(false);
 });
 
+projectList.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-project-id]");
+  if (!button) return;
+  openProject(button.dataset.projectId);
+});
+
+newProjectForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  newProjectError.textContent = "";
+  const payload = {
+    title: newProjectTitle.value.trim(),
+    clientName: newProjectClient.value.trim(),
+    clientEmail: newProjectEmail.value.trim(),
+    clientPassword: newProjectPassword.value,
+  };
+  const response = await fetch("/api/projects", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    newProjectError.textContent = "Project kon niet worden aangemaakt.";
+    return;
+  }
+  const data = await response.json();
+  currentProjects = [...currentProjects, data.project];
+  renderProjectList();
+  newProjectForm.reset();
+  newProjectError.textContent = "Project gemaakt. De uitnodiging staat in de projectkaart.";
+});
+
 async function startApp() {
   showApp();
   applySavedText();
   const response = await fetch("/logos.json");
   logos = await response.json();
   await loadSharedState();
+  setProjectTitleFallback();
   render();
 }
 
@@ -1016,14 +1176,19 @@ loginForm.addEventListener("submit", async (event) => {
   }
   currentSession = await response.json();
   loginPassword.value = "";
-  await startApp();
+  await showProjectOverview();
 });
 
-logoutButton.addEventListener("click", async () => {
+async function logout() {
   await fetch("/api/logout", { method: "POST" });
   currentSession = null;
+  currentProjects = [];
+  activeProject = null;
   showLogin("");
-});
+}
+
+logoutButton.addEventListener("click", logout);
+projectLogoutButton.addEventListener("click", logout);
 
 (async () => {
   const response = await fetch("/api/session", { cache: "no-store" });
@@ -1032,5 +1197,5 @@ logoutButton.addEventListener("click", async () => {
     return;
   }
   currentSession = await response.json();
-  await startApp();
+  await showProjectOverview();
 })();

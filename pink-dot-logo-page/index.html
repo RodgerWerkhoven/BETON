@@ -24,6 +24,40 @@
       </form>
     </section>
 
+    <section id="projectView" class="project-view" hidden>
+      <header class="project-head">
+        <div>
+          <p class="eyebrow">BETON projecten</p>
+          <h1>Projecten</h1>
+        </div>
+        <button id="projectLogoutButton" type="button">Uitloggen</button>
+      </header>
+      <main class="project-main">
+        <section class="project-list" id="projectList" aria-label="Projecten"></section>
+        <form id="newProjectForm" class="new-project-form" hidden>
+          <p class="eyebrow">Nieuw project</p>
+          <label>
+            <span>Projectnaam</span>
+            <input id="newProjectTitle" name="title" autocomplete="off" />
+          </label>
+          <label>
+            <span>Klantnaam</span>
+            <input id="newProjectClient" name="clientName" autocomplete="off" />
+          </label>
+          <label>
+            <span>Klant e-mail</span>
+            <input id="newProjectEmail" name="clientEmail" type="email" autocomplete="email" />
+          </label>
+          <label>
+            <span>Wachtwoord</span>
+            <input id="newProjectPassword" name="clientPassword" autocomplete="new-password" />
+          </label>
+          <button type="submit">Maak project</button>
+          <p id="newProjectError" class="login-error" role="alert"></p>
+        </form>
+      </main>
+    </section>
+
     <div id="appView" hidden>
     <header class="topbar">
       <div class="title-block">
@@ -60,6 +94,11 @@
       <input id="addFileInput" type="file" multiple hidden />
       <section id="gallery" class="gallery" aria-label="Images galerij"></section>
     </main>
+
+    <dialog id="lightboxDialog" class="lightbox-dialog">
+      <button id="lightboxClose" class="lightbox-close" type="button" aria-label="Sluiten">×</button>
+      <img id="lightboxImage" alt="" />
+    </dialog>
 
     <dialog id="cropDialog" class="crop-dialog">
       <form method="dialog">

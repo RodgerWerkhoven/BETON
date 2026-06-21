@@ -1,5 +1,5 @@
 const { get, put } = require("@vercel/blob");
-const { verifySession } = require("./auth-lib");
+const { verifySession, getDirectory, canAccessProject } = require("./auth-lib");
 
 const EMPTY_STATE = {
   crops: {},
@@ -29,15 +29,13 @@ async function streamToString(stream) {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-function statePath(client) {
-  return `clients/${client}/review-state.json`;
+function statePath(projectId) {
+  return `clients/${projectId}/review-state.json`;
 }
 
-function requestedClient(req, session) {
+function requestedProject(req) {
   const url = new URL(req.url || "/api/state", `https://${req.headers.host || "localhost"}`);
-  const target = url.searchParams.get("client") || "Alien";
-  if (session.role === "admin") return target;
-  return session.client;
+  return url.searchParams.get("project") || url.searchParams.get("client") || "Alien";
 }
 
 async function loadState(client) {
@@ -74,21 +72,23 @@ module.exports = async function handler(req, res) {
   try {
     const session = verifySession(req);
     if (!session) return res.status(401).json({ error: "Login nodig" });
-    const client = requestedClient(req, session);
+    const directory = await getDirectory();
+    const projectId = requestedProject(req);
+    if (!canAccessProject(directory, session, projectId)) return res.status(403).json({ error: "Geen toegang tot dit project" });
 
     if (req.method === "GET") {
-      return res.status(200).json(await loadState(client));
+      return res.status(200).json(await loadState(projectId));
     }
 
     if (req.method === "POST") {
       const patch = await readBody(req);
-      const state = await loadState(client);
+      const state = await loadState(projectId);
       mergeMap(state.crops, patch.crops);
       mergeMap(state.cropHistory, patch.cropHistory);
       mergeMap(state.review, patch.review);
       mergeMap(state.addedItems, patch.addedItems);
       mergeMap(state.text, patch.text);
-      await saveState(client, state);
+      await saveState(projectId, state);
       return res.status(200).json(state);
     }
 

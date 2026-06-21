@@ -1,8 +1,25 @@
 const crypto = require("crypto");
+const { get, put } = require("@vercel/blob");
 
 const CLIENTS = {
   Alien: { password: "Beton", label: "Alien", role: "client" },
   Rodger: { password: "Beton", label: "Rodger", role: "admin" },
+};
+
+const DEFAULT_DIRECTORY = {
+  users: {
+    Rodger: { password: "Beton", label: "Rodger", role: "admin" },
+    Alien: { password: "Beton", label: "Alien", role: "client" },
+  },
+  projects: {
+    Alien: {
+      id: "Alien",
+      title: "BETON",
+      owner: "Rodger",
+      members: ["Alien"],
+      createdAt: "2026-06-20T00:00:00.000Z",
+    },
+  },
 };
 
 function secret() {
@@ -26,22 +43,80 @@ function parseCookies(req) {
   );
 }
 
-function createSession(client) {
+async function streamToString(stream) {
+  const reader = stream.getReader();
+  const chunks = [];
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    chunks.push(Buffer.from(value));
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+async function getDirectory() {
+  try {
+    const result = await get("directory.json", { access: "private", useCache: false });
+    if (!result || result.statusCode !== 200 || !result.stream) return structuredClone(DEFAULT_DIRECTORY);
+    const directory = JSON.parse(await streamToString(result.stream));
+    return {
+      users: { ...DEFAULT_DIRECTORY.users, ...(directory.users || {}) },
+      projects: { ...DEFAULT_DIRECTORY.projects, ...(directory.projects || {}) },
+    };
+  } catch (error) {
+    if (error?.name === "BlobNotFoundError") return structuredClone(DEFAULT_DIRECTORY);
+    return structuredClone(DEFAULT_DIRECTORY);
+  }
+}
+
+async function saveDirectory(directory) {
+  await put("directory.json", JSON.stringify(directory), {
+    access: "private",
+    allowOverwrite: true,
+    addRandomSuffix: false,
+    cacheControlMaxAge: 0,
+    contentType: "application/json",
+  });
+}
+
+function projectsForUser(directory, session) {
+  const projects = Object.values(directory.projects || {});
+  if (session.role === "admin") return projects;
+  return projects.filter((project) => (project.members || []).includes(session.client));
+}
+
+function canAccessProject(directory, session, projectId) {
+  if (session.role === "admin") return Boolean(directory.projects[projectId]);
+  return Boolean(directory.projects[projectId]?.members?.includes(session.client));
+}
+
+function createSession(client, role = CLIENTS[client]?.role || "client") {
   const expires = Date.now() + 1000 * 60 * 60 * 24 * 30;
-  const payload = `${client}.${expires}`;
+  const payload = `v2.${client}.${role}.${expires}`;
   return `${payload}.${sign(payload)}`;
 }
 
 function verifySession(req) {
   const token = parseCookies(req).beton_session;
   if (!token) return null;
-  const [client, expires, signature] = token.split(".");
-  if (!client || !expires || !signature) return null;
-  const payload = `${client}.${expires}`;
+  const parts = token.split(".");
+  let client;
+  let role;
+  let expires;
+  let signature;
+  let payload;
+  if (parts[0] === "v2") {
+    [, client, role, expires, signature] = parts;
+    payload = `v2.${client}.${role}.${expires}`;
+  } else {
+    [client, expires, signature] = parts;
+    role = CLIENTS[client]?.role;
+    payload = `${client}.${expires}`;
+  }
+  if (!client || !role || !expires || !signature) return null;
   if (signature !== sign(payload)) return null;
   if (Number(expires) < Date.now()) return null;
-  if (!CLIENTS[client]) return null;
-  return { client, label: CLIENTS[client].label, role: CLIENTS[client].role };
+  return { client, label: CLIENTS[client]?.label || client, role };
 }
 
 function sessionCookie(token) {
@@ -59,4 +134,14 @@ function clearCookie() {
   return "beton_session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0";
 }
 
-module.exports = { CLIENTS, createSession, verifySession, sessionCookie, clearCookie };
+module.exports = {
+  CLIENTS,
+  createSession,
+  verifySession,
+  sessionCookie,
+  clearCookie,
+  getDirectory,
+  saveDirectory,
+  projectsForUser,
+  canAccessProject,
+};

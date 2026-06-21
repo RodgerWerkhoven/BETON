@@ -51,6 +51,17 @@ function projectUrl(req, project) {
   return `${appOrigin(req)}/?project=${encodeURIComponent(project.id)}`;
 }
 
+function requestedProject(req) {
+  const url = new URL(req.url || "/api/projects", `https://${req.headers.host || "localhost"}`);
+  return url.searchParams.get("id") || url.searchParams.get("project") || "";
+}
+
+function isMemberElsewhere(directory, projectId, clientName) {
+  return Object.values(directory.projects || {}).some((project) => (
+    project.id !== projectId && (project.members || []).includes(clientName)
+  ));
+}
+
 async function sendRodgerProjectNotification(req, project, creator) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
@@ -148,7 +159,22 @@ module.exports = async function handler(req, res) {
       return res.status(201).json({ project: publicProject(directory.projects[id], session), notification });
     }
 
-    res.setHeader("Allow", "GET, POST");
+    if (req.method === "DELETE") {
+      const projectId = requestedProject(req);
+      const project = directory.projects[projectId];
+      if (!project) return res.status(404).json({ error: "Project niet gevonden" });
+      if (project.id === "Alien" || project.baseAssets === true) return res.status(403).json({ error: "Basisproject kan niet worden verwijderd" });
+      if (!canManageProject(project, session)) return res.status(403).json({ error: "Geen rechten om dit project te verwijderen" });
+
+      delete directory.projects[projectId];
+      if (project.clientName && project.clientName !== "Rodger" && !isMemberElsewhere(directory, projectId, project.clientName)) {
+        delete directory.users[project.clientName];
+      }
+      await saveDirectory(directory);
+      return res.status(200).json({ deleted: true, id: projectId });
+    }
+
+    res.setHeader("Allow", "GET, POST, DELETE");
     return res.status(405).json({ error: "Method not allowed" });
   } catch (error) {
     return res.status(500).json({ error: error.message || "Projects API failed" });

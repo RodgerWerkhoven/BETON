@@ -67,7 +67,8 @@ body {
 #projectOverviewButton,
 .new-project-form button,
 .project-open,
-.project-invite {
+.project-invite,
+.project-delete {
   min-height: 44px;
   border: 1px solid var(--dark);
   border-radius: 8px;
@@ -168,6 +169,22 @@ body {
   place-items: center;
   background: var(--accent);
   text-decoration: none;
+}
+
+.project-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52px;
+  gap: 8px;
+}
+
+.project-delete {
+  display: grid;
+  place-items: center;
+  background: #f04438;
+  color: #ffffff;
+  font-size: 25px;
+  line-height: 1;
+  padding: 0;
 }
 
 .new-project-form {
@@ -352,6 +369,7 @@ main {
 .media-stop:focus-visible,
 .project-open:focus-visible,
 .project-invite:focus-visible,
+.project-delete:focus-visible,
 #projectLogoutButton:focus-visible,
 #projectOverviewButton:focus-visible,
 .new-project-form button:focus-visible,

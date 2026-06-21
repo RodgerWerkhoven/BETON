@@ -599,7 +599,12 @@ function renderProjectList() {
         <span>${escapeHtml(project.title)}</span>
         <small>${escapeHtml(project.id)}</small>
       </button>
-      ${project.canManage ? `<a class="project-invite" href="${escapeHtml(inviteHref(project))}">Nodig klant uit</a>` : ""}
+      ${project.canManage ? `
+        <div class="project-actions">
+          <a class="project-invite" href="${escapeHtml(inviteHref(project))}">Nodig klant uit</a>
+          ${project.baseAssets ? "" : `<button class="project-delete" type="button" data-project-delete="${escapeHtml(project.id)}" aria-label="Project verwijderen">☠️</button>`}
+        </div>
+      ` : ""}
     </article>
   `).join("");
 }
@@ -1295,10 +1300,31 @@ resetTextEdit.addEventListener("click", () => {
 });
 
 projectList.addEventListener("click", (event) => {
+  const deleteButton = event.target.closest("[data-project-delete]");
+  if (deleteButton) {
+    const projectId = deleteButton.dataset.projectDelete;
+    const project = currentProjects.find((item) => item.id === projectId);
+    if (!project) return;
+    if (!window.confirm(`Project "${project.title}" verwijderen?`)) return;
+    deleteProject(projectId);
+    return;
+  }
   const button = event.target.closest("[data-project-id]");
   if (!button) return;
   openProject(button.dataset.projectId);
 });
+
+async function deleteProject(projectId) {
+  newProjectError.textContent = "";
+  const response = await fetch(`/api/projects?id=${encodeURIComponent(projectId)}`, { method: "DELETE" });
+  if (!response.ok) {
+    newProjectError.textContent = "Project kon niet worden verwijderd.";
+    return;
+  }
+  currentProjects = currentProjects.filter((project) => project.id !== projectId);
+  renderProjectList();
+  newProjectError.textContent = "Project verwijderd.";
+}
 
 newProjectForm.addEventListener("submit", async (event) => {
   event.preventDefault();

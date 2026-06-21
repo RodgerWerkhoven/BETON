@@ -42,8 +42,10 @@ const resetTextEdit = document.querySelector("#resetTextEdit");
 const addFileInput = document.querySelector("#addFileInput");
 const editableTextNodes = Array.from(document.querySelectorAll("[data-edit-key]"));
 const lightboxDialog = document.querySelector("#lightboxDialog");
+const lightboxMediaStage = document.querySelector("#lightboxMediaStage");
 const lightboxImage = document.querySelector("#lightboxImage");
 const lightboxClose = document.querySelector("#lightboxClose");
+const lightboxStop = document.querySelector("#lightboxStop");
 
 const cropStoreKey = "beton-logo-crops-v2";
 const cropHistoryStoreKey = "beton-logo-crop-history-v1";
@@ -236,6 +238,58 @@ function isImageLogo(logo) {
   return !logo.type || logo.type.startsWith("image/");
 }
 
+function fileExtension(logo) {
+  return String(logo.name || logo.file || "").split(".").pop().toLowerCase();
+}
+
+function isVideoLogo(logo) {
+  return String(logo.type || "").startsWith("video/") || ["mov", "mp4", "m4v"].includes(fileExtension(logo));
+}
+
+function isAudioLogo(logo) {
+  return String(logo.type || "").startsWith("audio/") || ["aac", "mp3", "m4a"].includes(fileExtension(logo));
+}
+
+function isPlayableMedia(logo) {
+  return isVideoLogo(logo) || isAudioLogo(logo);
+}
+
+function mediaSource(logo) {
+  return logo.dataUrl || logoPath(logo.file);
+}
+
+function renderMediaStage(logo, safeName) {
+  const src = escapeHtml(mediaSource(logo));
+  if (isVideoLogo(logo)) {
+    return `
+      <div class="media-frame video-frame">
+        <video controls preload="metadata" src="${src}" aria-label="${safeName}"></video>
+        <div class="media-actions">
+          <button class="media-open" type="button" data-action="open-media" data-id="${logo.id}">Groot</button>
+          <button class="media-stop" type="button" data-action="stop-media" data-id="${logo.id}">Stop</button>
+        </div>
+      </div>
+    `;
+  }
+  if (isAudioLogo(logo)) {
+    return `
+      <div class="media-frame audio-frame">
+        <strong>${safeName}</strong>
+        <audio controls preload="metadata" src="${src}" aria-label="${safeName}"></audio>
+        <div class="media-actions">
+          <button class="media-open" type="button" data-action="open-media" data-id="${logo.id}">Groot</button>
+          <button class="media-stop" type="button" data-action="stop-media" data-id="${logo.id}">Stop</button>
+        </div>
+      </div>
+    `;
+  }
+  return `
+    <button class="image-button file-preview" type="button" data-id="${logo.id}">
+      <span class="file-kind">${escapeHtml(logo.type || "bestand")}</span><strong>${safeName}</strong>
+    </button>
+  `;
+}
+
 function visibleLogos() {
   const list = allLogos();
   if (activeFilter === "deleted") return list.filter((logo) => reviewState[logoStateKey(logo)]?.deleted);
@@ -408,11 +462,11 @@ function render() {
         const croppable = isImageLogo(logo);
         return `
         <article class="logo-card ${review.deleted ? "is-deleted" : ""}">
-          <button class="image-button ${croppable ? "" : "file-preview"}" type="button" data-id="${logo.id}">
-            ${croppable
-              ? `<img src="${imageSource(logo)}" data-fallback="${imageFallbackSource(logo)}" alt="${safeName}, ${logo.group}" loading="lazy" />`
-              : `<span class="file-kind">${escapeHtml(logo.type || "bestand")}</span><strong>${safeName}</strong>`}
-          </button>
+          ${croppable
+            ? `<button class="image-button" type="button" data-id="${logo.id}">
+                <img src="${imageSource(logo)}" data-fallback="${imageFallbackSource(logo)}" alt="${safeName}, ${logo.group}" loading="lazy" />
+              </button>`
+            : renderMediaStage(logo, safeName)}
           <div class="meta">
             <div class="meta-row">
               <span class="number">${logo.added ? "⊕" : `#${String(logo.id).padStart(2, "0")}`}</span>
@@ -459,7 +513,7 @@ function uploadCardTemplate() {
     <article class="logo-card upload-card">
       <button class="upload-drop" id="addFileButton" type="button">
         <span>⊕</span>
-        <strong>Nieuwe image of sheet</strong>
+        <strong>Nieuwe image, video, audio of sheet</strong>
         <small>Voeg bestand toe aan dit grid</small>
       </button>
       <div class="meta">
@@ -571,15 +625,51 @@ async function openProject(projectId) {
 }
 
 function openLightbox(logo) {
-  if (!logo || !isImageLogo(logo)) return;
-  lightboxImage.src = imageSource(logo);
-  lightboxImage.dataset.fallback = imageFallbackSource(logo);
-  lightboxImage.alt = logo.name || `Image ${logo.id}`;
+  if (!logo || (!isImageLogo(logo) && !isPlayableMedia(logo))) return;
+  stopMedia(lightboxDialog);
+  lightboxMediaStage.innerHTML = "";
+  lightboxMediaStage.hidden = true;
+  lightboxImage.hidden = true;
+  lightboxStop.hidden = true;
+  if (isImageLogo(logo)) {
+    lightboxImage.hidden = false;
+    lightboxImage.src = imageSource(logo);
+    lightboxImage.dataset.fallback = imageFallbackSource(logo);
+    lightboxImage.alt = logo.name || `Image ${logo.id}`;
+  } else if (isVideoLogo(logo)) {
+    lightboxMediaStage.hidden = false;
+    lightboxMediaStage.innerHTML = `<video controls autoplay src="${escapeHtml(mediaSource(logo))}" aria-label="${escapeHtml(logo.name || `Video ${logo.id}`)}"></video>`;
+    lightboxStop.hidden = false;
+  } else if (isAudioLogo(logo)) {
+    lightboxMediaStage.hidden = false;
+    lightboxMediaStage.innerHTML = `
+      <div class="lightbox-audio">
+        <strong>${escapeHtml(logo.name || `Audio ${logo.id}`)}</strong>
+        <audio controls autoplay src="${escapeHtml(mediaSource(logo))}" aria-label="${escapeHtml(logo.name || `Audio ${logo.id}`)}"></audio>
+      </div>
+    `;
+    lightboxStop.hidden = false;
+  }
   lightboxDialog.showModal();
 }
 
 function closeLightbox() {
+  stopMedia(lightboxDialog);
+  lightboxMediaStage.innerHTML = "";
+  lightboxMediaStage.hidden = true;
+  lightboxImage.removeAttribute("src");
   if (lightboxDialog.open) lightboxDialog.close();
+}
+
+function stopMedia(root = document) {
+  root.querySelectorAll("audio, video").forEach((media) => {
+    media.pause();
+    try {
+      media.currentTime = 0;
+    } catch {
+      // Some browsers refuse currentTime changes before media metadata exists.
+    }
+  });
 }
 
 function findLogo(id) {
@@ -966,6 +1056,13 @@ gallery.addEventListener("click", (event) => {
     if (action.dataset.action === "undo" && undoLogoCrop(logo)) {
       render();
     }
+    if (action.dataset.action === "stop-media") {
+      const frame = action.closest(".media-frame");
+      stopMedia(frame || document);
+    }
+    if (action.dataset.action === "open-media") {
+      openLightbox(logo);
+    }
     return;
   }
   const imageButton = event.target.closest(".image-button[data-id]");
@@ -991,9 +1088,12 @@ function imageFallbackHandler(event) {
 gallery.addEventListener("error", imageFallbackHandler, true);
 lightboxImage.addEventListener("error", imageFallbackHandler);
 
-lightboxDialog.addEventListener("click", closeLightbox);
+lightboxDialog.addEventListener("click", (event) => {
+  if (event.target === lightboxDialog) closeLightbox();
+});
 lightboxImage.addEventListener("click", closeLightbox);
 lightboxClose.addEventListener("click", closeLightbox);
+lightboxStop.addEventListener("click", () => stopMedia(lightboxDialog));
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape") closeLightbox();
 });

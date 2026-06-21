@@ -321,7 +321,9 @@ main {
 .delete-logo,
 .rating-button,
 .comment-toggle,
-.tag-edit {
+.tag-edit,
+.media-open,
+.media-stop {
   border: 1px solid var(--dark);
   border-radius: 8px;
   background: var(--card);
@@ -345,6 +347,8 @@ main {
 .rating-button:focus-visible,
 .comment-toggle:focus-visible,
 .tag-edit:focus-visible,
+.media-open:focus-visible,
+.media-stop:focus-visible,
 .project-open:focus-visible,
 .project-invite:focus-visible,
 #projectLogoutButton:focus-visible,
@@ -413,6 +417,10 @@ main {
 }
 
 .logo-card.is-deleted .image-button {
+  filter: grayscale(1);
+}
+
+.logo-card.is-deleted .media-frame {
   filter: grayscale(1);
 }
 
@@ -490,6 +498,66 @@ main {
   padding: 18px;
   color: var(--ink);
   text-align: center;
+}
+
+.media-frame {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 8px;
+  width: 100%;
+  height: 240px;
+  background: #000000;
+  color: #ffffff;
+  padding: 8px;
+}
+
+.media-frame video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: contain;
+  background: #000000;
+}
+
+.media-frame audio {
+  width: 100%;
+}
+
+.audio-frame {
+  align-content: center;
+  grid-template-rows: 1fr auto auto;
+}
+
+.audio-frame strong {
+  align-self: center;
+  justify-self: center;
+  max-width: 100%;
+  color: #ffffff;
+  font-size: 16px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.media-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.media-open,
+.media-stop {
+  min-height: 38px;
+  padding: 6px 8px;
+}
+
+.media-open {
+  background: var(--accent);
+}
+
+.media-stop {
+  background: #ffffff;
 }
 
 .file-preview strong {
@@ -831,6 +899,13 @@ main {
   place-items: center;
 }
 
+.lightbox-media-stage {
+  display: grid;
+  place-items: center;
+  width: 100vw;
+  height: 100vh;
+}
+
 .lightbox-dialog img {
   display: block;
   width: auto;
@@ -838,6 +913,42 @@ main {
   max-width: 100vw;
   max-height: 100vh;
   object-fit: contain;
+}
+
+.lightbox-media-stage video {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100vw;
+  max-height: 100vh;
+  background: #000000;
+  object-fit: contain;
+}
+
+.lightbox-audio {
+  display: grid;
+  gap: 18px;
+  width: min(680px, calc(100vw - 32px));
+  color: #ffffff;
+  text-align: center;
+}
+
+.lightbox-audio strong {
+  font-size: clamp(20px, 6vw, 44px);
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.lightbox-audio audio {
+  width: 100%;
+}
+
+.lightbox-stop {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2;
+  background: var(--accent);
 }
 
 .lightbox-close {

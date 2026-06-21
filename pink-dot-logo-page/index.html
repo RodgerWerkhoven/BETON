@@ -91,12 +91,14 @@
         <button class="filter active" data-filter="all">TAGS</button>
       </section>
 
-      <input id="addFileInput" type="file" multiple hidden />
+      <input id="addFileInput" type="file" accept="image/*,video/mp4,video/quicktime,audio/mpeg,audio/aac,audio/mp4,.mov,.mp4,.mp3,.aac,.m4a" multiple hidden />
       <section id="gallery" class="gallery" aria-label="Images galerij"></section>
     </main>
 
     <dialog id="lightboxDialog" class="lightbox-dialog">
       <button id="lightboxClose" class="lightbox-close" type="button" aria-label="Sluiten">×</button>
+      <div id="lightboxMediaStage" class="lightbox-media-stage"></div>
+      <button id="lightboxStop" class="media-stop lightbox-stop" type="button" hidden>Stop</button>
       <img id="lightboxImage" alt="" />
     </dialog>
 

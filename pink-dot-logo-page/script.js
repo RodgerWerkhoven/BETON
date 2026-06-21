@@ -348,7 +348,9 @@ function uniqueTags(tags) {
 function inferredTags(logo) {
   const text = `${logo.group || ""} ${logo.source || ""} ${logo.name || ""} ${logo.file || ""}`;
   const tags = [logo.group || "TOEGEVOEGD"];
-  if (/\b3d\b/i.test(text)) tags.push("3D");
+  if (isAudioLogo(logo)) tags.push("AUDIO");
+  else if (isVideoLogo(logo)) tags.push("VIDEO");
+  else if (/\b3d\b/i.test(text)) tags.push("3D");
   else tags.push("GRAFISCH");
   return uniqueTags(tags);
 }
@@ -731,16 +733,21 @@ function safeUploadName(file) {
 }
 
 async function uploadMediaFile(file, id) {
-  const response = await fetch(`/api/upload-file?project=${encodeURIComponent(activeProjectId)}&name=${encodeURIComponent(`${id}-${safeUploadName(file)}`)}`, {
+  const ticketResponse = await fetch(`/api/upload-url?project=${encodeURIComponent(activeProjectId)}&name=${encodeURIComponent(`${id}-${safeUploadName(file)}`)}&type=${encodeURIComponent(file.type || "application/octet-stream")}`, {
     method: "POST",
+  });
+  if (!ticketResponse.ok) throw new Error(await ticketResponse.text());
+  const ticket = await ticketResponse.json();
+  const uploadResponse = await fetch(ticket.presignedUrl, {
+    method: "PUT",
     headers: { "Content-Type": file.type || "application/octet-stream" },
     body: file,
   });
-  if (!response.ok) throw new Error(await response.text());
-  const result = await response.json();
+  if (!uploadResponse.ok) throw new Error(await uploadResponse.text());
+  const result = await uploadResponse.json();
   return {
     url: result.url,
-    blobPathname: result.blobPathname,
+    blobPathname: result.pathname || ticket.pathname,
   };
 }
 

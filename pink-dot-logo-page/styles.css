@@ -185,6 +185,13 @@ body > div {
   white-space: nowrap;
 }
 
+.project-copy.copy-success,
+#copyNewProjectLink.copy-success {
+  background: var(--copy-success-color, var(--accent));
+  box-shadow: 0 0 0 3px var(--dark);
+  color: var(--ink);
+}
+
 .project-delete {
   display: grid;
   grid-column: 2 / 3;
@@ -242,8 +249,18 @@ body > div {
   padding: 8px 10px;
 }
 
+.new-project-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.new-project-actions button {
+  flex: 1 1 170px;
+}
+
 #copyNewProjectLink {
-  min-width: 190px;
+  min-width: min(100%, 210px);
   white-space: nowrap;
 }
 
@@ -903,6 +920,10 @@ main {
   font-size: clamp(24px, 4vw, 42px);
 }
 
+.crop-head {
+  padding-right: 64px;
+}
+
 .crop-actions,
 .crop-footer {
   flex-wrap: wrap;
@@ -910,7 +931,13 @@ main {
 
 .crop-actions {
   display: flex;
+  max-width: 100%;
+  justify-content: flex-end;
   gap: 8px;
+}
+
+.crop-actions button {
+  flex: 0 0 auto;
 }
 
 .crop-actions button.active {
@@ -1083,11 +1110,11 @@ main {
   }
 
   .project-actions {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) 52px;
   }
 
   .project-delete {
-    grid-column: auto;
+    grid-column: 2 / 3;
   }
 
   .project-head {
@@ -1131,18 +1158,23 @@ main {
 
   .crop-head,
   .crop-footer {
-    align-items: stretch;
+    align-items: flex-start;
     flex-direction: column;
+  }
+
+  .crop-head {
+    padding-right: 58px;
   }
 
   .crop-actions,
   .crop-footer button,
   .sheet-actions button {
-    width: 100%;
+    max-width: 100%;
   }
 
   .crop-actions button {
-    flex: 1;
+    flex: 0 1 auto;
+    min-width: 82px;
   }
 
   .sheet-actions {

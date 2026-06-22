@@ -46,16 +46,10 @@
               <span>PASSWORD PROJECT:</span>
               <input id="newProjectPassword" name="projectPassword" autocomplete="new-password" placeholder="maak password aan" />
             </label>
-            <label>
-              <span>E-MAILS ANDERE CURATOREN:</span>
-              <input id="newProjectCuratorEmailA" name="curatorEmailA" type="email" autocomplete="email" placeholder="vul hier e-mail in" />
-            </label>
-            <label>
-              <span>E-MAILS ANDERE CURATOREN:</span>
-              <input id="newProjectCuratorEmailB" name="curatorEmailB" type="email" autocomplete="email" placeholder="vul hier e-mail in" />
-            </label>
-            <button type="submit">MAAK PROJECT</button>
-            <button id="copyNewProjectLink" type="button" disabled>COPY PROJECT LINK</button>
+            <div class="new-project-actions">
+              <button type="submit">MAAK PROJECT</button>
+              <button id="copyNewProjectLink" type="button" disabled>COPY PROJECT LINK</button>
+            </div>
             <p id="newProjectError" class="login-error" role="alert"></p>
           </form>
         </aside>

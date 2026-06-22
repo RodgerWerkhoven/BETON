@@ -13,8 +13,6 @@ const newProjectToggle = document.querySelector("#newProjectToggle");
 const newProjectForm = document.querySelector("#newProjectForm");
 const newProjectTitle = document.querySelector("#newProjectTitle");
 const newProjectPassword = document.querySelector("#newProjectPassword");
-const newProjectCuratorEmailA = document.querySelector("#newProjectCuratorEmailA");
-const newProjectCuratorEmailB = document.querySelector("#newProjectCuratorEmailB");
 const copyNewProjectLink = document.querySelector("#copyNewProjectLink");
 const newProjectError = document.querySelector("#newProjectError");
 const voteButtons = document.querySelector("#voteButtons");
@@ -746,33 +744,22 @@ function inviteUrl(project) {
   return `${window.location.origin}${window.location.pathname}?project=${encodeURIComponent(project.id)}`;
 }
 
-function projectLoginName(project) {
-  return project.clientName || project.title || "";
-}
-
-function curatorEmails(project) {
-  return [
-    ...(Array.isArray(project.curatorEmails) ? project.curatorEmails : []),
-    project.clientEmail,
-    project.voterEmail,
-  ].filter(Boolean).filter((email, index, list) => list.indexOf(email) === index);
-}
-
-function inviteHref(project, targetEmail = "") {
-  const targetPassword = project.clientPassword || project.projectPassword || "";
-  const subject = `Uitnodiging voor ${project.title}`;
-  const body = [
-    `Je kunt inloggen op de curator page voor ${project.title}:`,
-    inviteUrl(project),
-    "",
-    `Naam project: ${projectLoginName(project)}`,
-    `Wachtwoord: ${targetPassword || ""}`,
-  ].join("\n");
-  return `mailto:${encodeURIComponent(targetEmail || "")}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-}
-
 async function copyProjectLink(project) {
   await navigator.clipboard.writeText(inviteUrl(project));
+}
+
+function currentUserAccentColor() {
+  return ensureCurrentVoterRegistered({ persist: false }).color?.color || rodgerVoterColor.color;
+}
+
+function flashCopySuccess(button) {
+  if (!button) return;
+  const color = currentUserAccentColor();
+  button.style.setProperty("--copy-success-color", color);
+  button.classList.add("copy-success");
+  window.setTimeout(() => {
+    button.classList.remove("copy-success");
+  }, 1400);
 }
 
 function renderProjectList() {
@@ -2153,6 +2140,7 @@ projectList.addEventListener("click", (event) => {
     if (!project) return;
     copyProjectLink(project)
       .then(() => {
+        flashCopySuccess(copyButton);
         newProjectError.textContent = "Projectlink gekopieerd.";
       })
       .catch(() => {
@@ -2198,14 +2186,9 @@ newProjectForm.addEventListener("submit", async (event) => {
   newProjectError.textContent = "";
   lastCreatedProject = null;
   copyNewProjectLink.disabled = true;
-  const curatorEmailsPayload = [
-    newProjectCuratorEmailA.value.trim(),
-    newProjectCuratorEmailB.value.trim(),
-  ].filter(Boolean);
   const payload = {
     title: newProjectTitle.value.trim(),
     projectPassword: newProjectPassword.value,
-    curatorEmails: curatorEmailsPayload,
   };
   const response = await fetch("/api/projects", {
     method: "POST",
@@ -2229,6 +2212,7 @@ copyNewProjectLink.addEventListener("click", () => {
   if (!lastCreatedProject) return;
   copyProjectLink(lastCreatedProject)
     .then(() => {
+      flashCopySuccess(copyNewProjectLink);
       newProjectError.textContent = "Projectlink gekopieerd.";
     })
     .catch(() => {

@@ -100,6 +100,8 @@ let sheetImageRect = { x: 0, y: 0, width: 1, height: 1, scale: 1 };
 let sheetPointer = null;
 let activeSheetLogo = null;
 let lastCreatedProject = null;
+let ratingRequestSerial = 0;
+const latestRatingRequest = new Map();
 
 function showLogin(message = "") {
   loginView.hidden = false;
@@ -786,7 +788,6 @@ function renderProjectList() {
       </button>
       ${project.canManage ? `
         <div class="project-actions">
-          <a class="project-invite" href="${escapeHtml(inviteHref(project, curatorEmails(project).join(",")))}">VERSTUUR UITNODIGING(EN)</a>
           <button class="project-copy" type="button" data-project-copy="${escapeHtml(project.id)}">COPY PROJECT LINK</button>
           ${project.baseAssets ? "" : `<button class="project-delete" type="button" data-project-delete="${escapeHtml(project.id)}" aria-label="Project verwijderen">☠️</button>`}
         </div>
@@ -1867,22 +1868,41 @@ gallery.addEventListener("click", async (event) => {
     const key = logoStateKey(logo);
     if (action.dataset.action === "rating") {
       const voterKey = currentVoterKey();
-      const hadCurrentVote = action.dataset.currentVoted === "true" || votesFor(review)[voterKey] === action.dataset.rating;
-      await refreshReviewItem(key);
       const voterRegistration = ensureCurrentVoterRegistered({ persist: false });
-      const refreshedReview = logoReview(logo);
-      const remoteHadCurrentVote = votesFor(refreshedReview)[voterKey] === action.dataset.rating;
-      refreshedReview.votes = votesFor(refreshedReview);
-      if (hadCurrentVote || remoteHadCurrentVote) delete refreshedReview.votes[voterKey];
-      else refreshedReview.votes[voterKey] = action.dataset.rating;
-      delete refreshedReview.ratings;
-      delete refreshedReview.rating;
-      reviewState[key] = refreshedReview;
+      const requestId = (ratingRequestSerial += 1);
+      latestRatingRequest.set(key, requestId);
+      const rating = action.dataset.rating;
+      const localVotes = votesFor(review);
+      const shouldRemoveVote = action.dataset.currentVoted === "true" || localVotes[voterKey] === rating;
+      const optimisticReview = { ...review, votes: { ...localVotes } };
+      if (shouldRemoveVote) delete optimisticReview.votes[voterKey];
+      else optimisticReview.votes[voterKey] = rating;
+      delete optimisticReview.ratings;
+      delete optimisticReview.rating;
+      reviewState[key] = optimisticReview;
       writeJson(reviewStoreKey, reviewState);
-      const patch = { review: { [key]: reviewState[key] || null } };
-      if (voterRegistration.changed && voterRegistration.color) patch.voters = { [voterKey]: voterRegistration.color };
-      await queuePersist(patch);
       render();
+      refreshReviewItem(key)
+        .then(() => {
+          if (latestRatingRequest.get(key) !== requestId) return null;
+          const refreshedReview = { ...logoReview(logo) };
+          refreshedReview.votes = votesFor(refreshedReview);
+          if (shouldRemoveVote) delete refreshedReview.votes[voterKey];
+          else refreshedReview.votes[voterKey] = rating;
+          delete refreshedReview.ratings;
+          delete refreshedReview.rating;
+          reviewState[key] = refreshedReview;
+          writeJson(reviewStoreKey, reviewState);
+          const patch = { review: { [key]: reviewState[key] || null } };
+          if (voterRegistration.changed && voterRegistration.color) patch.voters = { [voterKey]: voterRegistration.color };
+          return queuePersist(patch);
+        })
+        .then((result) => {
+          if (result !== null && latestRatingRequest.get(key) === requestId) render();
+        })
+        .catch(() => {
+          schedulePersist({ review: { [key]: reviewState[key] || null } });
+        });
     }
     if (action.dataset.action === "delete") {
       review.deleted = !review.deleted;
@@ -2200,7 +2220,6 @@ newProjectForm.addEventListener("submit", async (event) => {
   currentProjects = [...currentProjects, data.project];
   lastCreatedProject = data.project;
   renderProjectList();
-  if (curatorEmailsPayload.length) window.location.href = inviteHref(data.project, curatorEmailsPayload.join(","));
   newProjectForm.reset();
   copyNewProjectLink.disabled = false;
   newProjectError.textContent = "Project gemaakt. Rodger staat erbij; de link staat klaar.";

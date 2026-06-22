@@ -77,7 +77,6 @@ body > div {
 .new-project-toggle,
 .new-project-form button,
 .project-open,
-.project-invite,
 .project-copy,
 .project-delete {
   min-height: 44px;
@@ -175,26 +174,20 @@ body > div {
   overflow-wrap: anywhere;
 }
 
-.project-invite {
-  display: grid;
-  place-items: center;
-  background: var(--accent);
-  text-decoration: none;
-}
-
 .project-actions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 52px;
+  grid-template-columns: minmax(190px, 1fr) 52px;
   gap: 8px;
 }
 
 .project-copy {
   background: var(--card);
+  white-space: nowrap;
 }
 
 .project-delete {
   display: grid;
-  grid-column: 3 / 4;
+  grid-column: 2 / 3;
   grid-row: 1 / 2;
   place-items: center;
   background: #f04438;
@@ -247,6 +240,11 @@ body > div {
   font: inherit;
   font-size: 16px;
   padding: 8px 10px;
+}
+
+#copyNewProjectLink {
+  min-width: 190px;
+  white-space: nowrap;
 }
 
 .sheet-stage {
@@ -415,7 +413,6 @@ main {
 .media-open:focus-visible,
 .media-stop:focus-visible,
 .project-open:focus-visible,
-.project-invite:focus-visible,
 .project-copy:focus-visible,
 .project-delete:focus-visible,
 #projectLogoutButton:focus-visible,
@@ -778,7 +775,7 @@ main {
 }
 
 .sheet-logo {
-  background: var(--voter-yellow);
+  background: #ffffff;
 }
 
 .undo-card,

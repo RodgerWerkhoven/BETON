@@ -3,14 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>BETON images review</title>
+    <title>ANÓTHER DIMENSION VOTING BOOTH</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <section id="loginView" class="login-view" hidden>
       <form id="loginForm" class="login-panel">
-        <p class="eyebrow">BETON klantlogin</p>
-        <h1>Images review</h1>
+        <p class="eyebrow">ANÓTHER DIMENSION</p>
+        <h1>VOTING BOOTH</h1>
         <label>
           <span>Naam</span>
           <input id="loginName" name="name" autocomplete="username" required />
@@ -27,43 +27,74 @@
     <section id="projectView" class="project-view" hidden>
       <header class="project-head">
         <div>
-          <p class="eyebrow">BETON projecten</p>
-          <h1>Projecten</h1>
+          <p class="eyebrow">ANÓTHER DIMENSION</p>
+          <h1>VOTING BOOTH</h1>
         </div>
         <button id="projectLogoutButton" type="button">Uitloggen</button>
       </header>
       <main class="project-main">
         <section class="project-list" id="projectList" aria-label="Projecten"></section>
-        <form id="newProjectForm" class="new-project-form" hidden>
-          <p class="eyebrow">Nieuw project</p>
-          <label>
-            <span>Projectnaam</span>
-            <input id="newProjectTitle" name="title" autocomplete="off" />
-          </label>
-          <label>
-            <span>Klantnaam</span>
-            <input id="newProjectClient" name="clientName" autocomplete="off" />
-          </label>
-          <label>
-            <span>Klant e-mail</span>
-            <input id="newProjectEmail" name="clientEmail" type="email" autocomplete="email" />
-          </label>
-          <label>
-            <span>Wachtwoord</span>
-            <input id="newProjectPassword" name="clientPassword" autocomplete="new-password" />
-          </label>
-          <button type="submit">Maak project</button>
-          <p id="newProjectError" class="login-error" role="alert"></p>
-        </form>
+        <aside class="project-tools">
+          <form id="newProjectForm" class="new-project-form" hidden>
+            <p class="eyebrow">Nieuw project</p>
+            <label>
+              <span>Projectnaam</span>
+              <input id="newProjectTitle" name="title" autocomplete="off" />
+            </label>
+            <label>
+              <span>Klantnaam</span>
+              <input id="newProjectClient" name="clientName" autocomplete="off" />
+            </label>
+            <label>
+              <span>Klant e-mail</span>
+              <input id="newProjectEmail" name="clientEmail" type="email" autocomplete="email" />
+            </label>
+            <label>
+              <span>Wachtwoord</span>
+              <input id="newProjectPassword" name="clientPassword" autocomplete="new-password" />
+            </label>
+            <label>
+              <span>Derde voter</span>
+              <input id="newProjectVoter" name="voterName" autocomplete="off" />
+            </label>
+            <label>
+              <span>Derde voter e-mail</span>
+              <input id="newProjectVoterEmail" name="voterEmail" type="email" autocomplete="email" />
+            </label>
+            <label>
+              <span>Derde voter wachtwoord</span>
+              <input id="newProjectVoterPassword" name="voterPassword" autocomplete="new-password" />
+            </label>
+            <button type="submit">Maak project</button>
+            <p id="newProjectError" class="login-error" role="alert"></p>
+          </form>
+          <section id="sheetCutter" class="sheet-cutter">
+            <p class="eyebrow">Sheet Cutter</p>
+            <label>
+              <span>Project</span>
+              <select id="sheetProjectSelect"></select>
+            </label>
+            <input id="sheetFileInput" type="file" accept="image/*" hidden />
+            <button id="sheetPickButton" type="button">Sheet uploaden</button>
+            <div id="sheetStage" class="sheet-stage" hidden>
+              <canvas id="sheetCanvas" width="900" height="560"></canvas>
+            </div>
+            <div class="sheet-actions">
+              <button id="sheetResetButton" type="button" hidden>Reset</button>
+              <button id="sheetCutButton" class="sheet-cut" type="button" hidden>✅</button>
+            </div>
+            <p id="sheetStatus" class="login-error" role="alert"></p>
+          </section>
+        </aside>
       </main>
     </section>
 
     <div id="appView" hidden>
     <header class="topbar">
       <div class="title-block">
-        <p class="eyebrow">BETON images selectie</p>
+        <p class="eyebrow">ANÓTHER DIMENSION VOTING BOOTH</p>
         <div class="title-row">
-          <h1 data-edit-key="title">Images review</h1>
+          <h1 data-edit-key="title">ANÓTHER DIMENSION VOTING BOOTH</h1>
           <section class="text-tools" aria-label="Naam bewerken">
             <button id="toggleTextEdit" type="button">Naam wijzigen</button>
             <button id="saveTextEdit" type="button" hidden>Naam opslaan</button>
@@ -75,6 +106,7 @@
         <div class="vote-buttons">
           <button class="vote-filter vote-filter-client" id="clientVoteFilter" type="button" data-filter="vote-client" aria-label="Groene stemmen tonen"></button>
           <button class="vote-filter vote-filter-admin" id="adminVoteFilter" type="button" data-filter="vote-admin" aria-label="Pink stemmen tonen"></button>
+          <button class="vote-filter vote-filter-voter3" id="voter3VoteFilter" type="button" data-filter="vote-voter3" aria-label="Lichtblauwe stemmen tonen"></button>
         </div>
         <div class="vote-label">VOTES</div>
       </section>
@@ -130,6 +162,8 @@
       <p id="cropMeta" class="crop-meta"></p>
     </dialog>
     </div>
+
+    <img class="brand-mark" src="/assets/another-dimension-logo.png" alt="ANÓTHER DIMENSION" />
 
     <script src="/script.js"></script>
   </body>

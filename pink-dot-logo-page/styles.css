@@ -6,6 +6,8 @@
   --line: #d4cdc0;
   --card: #ffffff;
   --accent: #ff30d6;
+  --voter-green: #60d46f;
+  --voter-blue: #9adfff;
   --dark: #1b1b19;
 }
 
@@ -23,6 +25,12 @@ body {
   background: var(--paper);
   color: var(--ink);
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body > section,
+body > div {
+  position: relative;
+  z-index: 1;
 }
 
 .login-view {
@@ -66,6 +74,7 @@ body {
 #projectLogoutButton,
 #projectOverviewButton,
 .new-project-form button,
+.sheet-cutter button,
 .project-open,
 .project-invite,
 .project-delete {
@@ -177,8 +186,14 @@ body {
   gap: 8px;
 }
 
+.project-invite-voter3 {
+  grid-column: 1 / 2;
+}
+
 .project-delete {
   display: grid;
+  grid-column: 2 / 3;
+  grid-row: 1 / span 2;
   place-items: center;
   background: #f04438;
   color: #ffffff;
@@ -187,7 +202,13 @@ body {
   padding: 0;
 }
 
-.new-project-form {
+.project-tools {
+  display: grid;
+  gap: 14px;
+}
+
+.new-project-form,
+.sheet-cutter {
   display: grid;
   gap: 12px;
   border: 1px solid var(--dark);
@@ -196,13 +217,15 @@ body {
   padding: 14px;
 }
 
-.new-project-form h2 {
+.new-project-form h2,
+.sheet-cutter h2 {
   margin: 0;
   font-size: 24px;
   line-height: 1.05;
 }
 
-.new-project-form label {
+.new-project-form label,
+.sheet-cutter label {
   display: grid;
   gap: 6px;
   color: var(--muted);
@@ -210,7 +233,8 @@ body {
   font-weight: 850;
 }
 
-.new-project-form input {
+.new-project-form input,
+.sheet-cutter select {
   width: 100%;
   min-height: 44px;
   border: 1px solid var(--line);
@@ -219,6 +243,31 @@ body {
   font: inherit;
   font-size: 16px;
   padding: 8px 10px;
+}
+
+.sheet-stage {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+#sheetCanvas {
+  display: block;
+  width: 100%;
+  height: min(52vh, 520px);
+  touch-action: none;
+}
+
+.sheet-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.sheet-cut {
+  min-width: 58px;
+  background: var(--voter-green);
 }
 
 .topbar {
@@ -263,11 +312,15 @@ body {
 }
 
 .vote-filter-client {
-  background: #60d46f;
+  background: var(--voter-green);
 }
 
 .vote-filter-admin {
   background: var(--accent);
+}
+
+.vote-filter-voter3 {
+  background: var(--voter-blue);
 }
 
 .vote-filter.active {
@@ -373,6 +426,8 @@ main {
 #projectLogoutButton:focus-visible,
 #projectOverviewButton:focus-visible,
 .new-project-form button:focus-visible,
+.sheet-cutter button:focus-visible,
+.sheet-cutter select:focus-visible,
 .comment textarea:focus-visible,
 .filter:focus-visible,
 .close:focus-visible,
@@ -450,6 +505,7 @@ main {
 }
 
 .upload-drop {
+  position: relative;
   display: grid;
   place-items: center;
   align-content: center;
@@ -457,13 +513,16 @@ main {
   width: 100%;
   height: 240px;
   border: 0;
-  background: repeating-linear-gradient(
-    -45deg,
-    #fffaf1,
-    #fffaf1 10px,
-    #f1eadb 10px,
-    #f1eadb 20px
-  );
+  background:
+    linear-gradient(rgba(255, 250, 241, 0.76), rgba(255, 250, 241, 0.76)),
+    url("/assets/another-dimension-logo.png") center / min(70%, 240px) auto no-repeat,
+    repeating-linear-gradient(
+      -45deg,
+      #fffaf1,
+      #fffaf1 10px,
+      #f1eadb 10px,
+      #f1eadb 20px
+    );
   color: var(--ink);
   cursor: pointer;
   padding: 18px;
@@ -480,6 +539,18 @@ main {
   background: var(--accent);
   font-size: 46px;
   line-height: 1;
+}
+
+.brand-mark {
+  position: fixed;
+  right: 14px;
+  bottom: 12px;
+  z-index: 0;
+  width: clamp(96px, 16vw, 190px);
+  height: auto;
+  opacity: 0.42;
+  pointer-events: none;
+  mix-blend-mode: multiply;
 }
 
 .upload-drop strong {
@@ -1017,6 +1088,10 @@ main {
     grid-template-columns: 1fr;
   }
 
+  .project-actions {
+    grid-template-columns: 1fr 52px;
+  }
+
   .project-head {
     align-items: stretch;
     flex-direction: column;
@@ -1063,12 +1138,21 @@ main {
   }
 
   .crop-actions,
-  .crop-footer button {
+  .crop-footer button,
+  .sheet-actions button {
     width: 100%;
   }
 
   .crop-actions button {
     flex: 1;
+  }
+
+  .sheet-actions {
+    flex-direction: column;
+  }
+
+  .brand-mark {
+    width: 88px;
   }
 }
 

@@ -14,7 +14,19 @@ const newProjectTitle = document.querySelector("#newProjectTitle");
 const newProjectClient = document.querySelector("#newProjectClient");
 const newProjectEmail = document.querySelector("#newProjectEmail");
 const newProjectPassword = document.querySelector("#newProjectPassword");
+const newProjectVoter = document.querySelector("#newProjectVoter");
+const newProjectVoterEmail = document.querySelector("#newProjectVoterEmail");
+const newProjectVoterPassword = document.querySelector("#newProjectVoterPassword");
 const newProjectError = document.querySelector("#newProjectError");
+const sheetProjectSelect = document.querySelector("#sheetProjectSelect");
+const sheetFileInput = document.querySelector("#sheetFileInput");
+const sheetPickButton = document.querySelector("#sheetPickButton");
+const sheetStage = document.querySelector("#sheetStage");
+const sheetCanvas = document.querySelector("#sheetCanvas");
+const sheetContext = sheetCanvas.getContext("2d");
+const sheetResetButton = document.querySelector("#sheetResetButton");
+const sheetCutButton = document.querySelector("#sheetCutButton");
+const sheetStatus = document.querySelector("#sheetStatus");
 const gallery = document.querySelector("#gallery");
 const count = document.querySelector("#count");
 const controls = document.querySelector(".controls");
@@ -22,6 +34,7 @@ const addedFilter = document.querySelector("#addedFilter");
 const deletedFilter = document.querySelector("#deletedFilter");
 const clientVoteFilter = document.querySelector("#clientVoteFilter");
 const adminVoteFilter = document.querySelector("#adminVoteFilter");
+const voter3VoteFilter = document.querySelector("#voter3VoteFilter");
 const cropDialog = document.querySelector("#cropDialog");
 const cropCanvas = document.querySelector("#cropCanvas");
 const cropContext = cropCanvas.getContext("2d");
@@ -54,6 +67,11 @@ const reviewStoreKey = "beton-logo-review-state-v1";
 const addedItemsStoreKey = "beton-logo-added-items-v1";
 const textStoreKey = "beton-logo-page-text-v1";
 const ratingOptions = ["🤩", "🙂", "🆗", "🤔", "🤮"];
+const voterRoles = [
+  { role: "client", color: "#60d46f", filter: "vote-client" },
+  { role: "admin", color: "#ff30d6", filter: "vote-admin" },
+  { role: "voter3", color: "#9adfff", filter: "vote-voter3" },
+];
 const defaults = Object.fromEntries(editableTextNodes.map((node) => [node.dataset.editKey, node.textContent]));
 let activeProjectId = new URLSearchParams(window.location.search).get("project") || "Alien";
 
@@ -74,6 +92,11 @@ let persistTimer = null;
 let currentSession = null;
 let currentProjects = [];
 let activeProject = null;
+let sheetImage = null;
+let sheetImageName = "";
+let sheetBoxes = [];
+let sheetImageRect = { x: 0, y: 0, width: 1, height: 1, scale: 1 };
+let sheetPointer = null;
 
 function showLogin(message = "") {
   loginView.hidden = false;
@@ -309,6 +332,7 @@ function visibleLogos() {
   if (activeFilter === "TOEGEVOEGD") return active.filter((logo) => logo.group === "TOEGEVOEGD" || logo.group === "ADDED");
   if (activeFilter === "vote-client") return active.filter((logo) => hasVote(logo, "client"));
   if (activeFilter === "vote-admin") return active.filter((logo) => hasVote(logo, "admin"));
+  if (activeFilter === "vote-voter3") return active.filter((logo) => hasVote(logo, "voter3"));
   if (activeFilter === "all") return active;
   return active.filter((logo) => tagsFor(logo, logoReview(logo)).includes(activeFilter));
 }
@@ -318,11 +342,34 @@ function logoReview(logo) {
 }
 
 function currentRatingRole() {
-  return currentSession?.role === "admin" ? "admin" : "client";
+  if (currentSession?.role === "admin") return "admin";
+  if (currentSession?.role === "voter3") return "voter3";
+  return "client";
 }
 
 function ratingsFor(review) {
   return review.ratings || (review.rating ? { client: review.rating } : {});
+}
+
+function rolesForRating(ratings, rating) {
+  return voterRoles.filter((item) => ratings[item.role] === rating);
+}
+
+function voteBackground(roles) {
+  if (!roles.length) return "";
+  if (roles.length === 1) return roles[0].color;
+  const stop = 100 / roles.length;
+  const segments = roles.flatMap((item, index) => {
+    const start = (stop * index).toFixed(4);
+    const end = (stop * (index + 1)).toFixed(4);
+    return [`${item.color} ${start}%`, `${item.color} ${end}%`];
+  });
+  return `linear-gradient(90deg, ${segments.join(", ")})`;
+}
+
+function ratingButtonStyle(roles) {
+  const background = voteBackground(roles);
+  return background ? ` style="background: ${background}"` : "";
 }
 
 function hasVote(logo, role) {
@@ -361,7 +408,7 @@ function tagsFor(logo, review) {
 }
 
 function isTagFiltered() {
-  return !["all", "TOEGEVOEGD", "deleted", "vote-client", "vote-admin"].includes(activeFilter);
+  return !["all", "TOEGEVOEGD", "deleted", ...voterRoles.map((item) => item.filter)].includes(activeFilter);
 }
 
 function renderTags(logo, review) {
@@ -395,10 +442,13 @@ function renderFilters() {
   deletedFilter.classList.toggle("active", activeFilter === "deleted");
   clientVoteFilter.classList.toggle("active", activeFilter === "vote-client");
   adminVoteFilter.classList.toggle("active", activeFilter === "vote-admin");
+  voter3VoteFilter.classList.toggle("active", activeFilter === "vote-voter3");
 }
 
 function currentCommentPrefix() {
-  return currentSession?.role === "admin" ? "R:" : "A:";
+  if (currentSession?.role === "admin") return "R:";
+  if (currentSession?.role === "voter3") return "B:";
+  return "A:";
 }
 
 function commentValue(review) {
@@ -490,14 +540,17 @@ function render() {
             <div class="rating" role="group" aria-label="Rating voor image ${logo.id}">
               ${ratingOptions.map((rating) => {
                 const ratings = ratingsFor(review);
+                const voteRoles = rolesForRating(ratings, rating);
                 return `
                 <button
-                  class="rating-button ${ratings.admin === rating ? "admin-rated" : ""} ${ratings.client === rating ? "client-rated" : ""}"
+                  class="rating-button ${voteRoles.map((item) => `${item.role}-rated`).join(" ")}"
                   type="button"
                   data-action="rating"
                   data-id="${logo.id}"
                   data-rating="${rating}"
+                  data-vote-count="${voteRoles.length}"
                   aria-label="Rating ${rating}"
+                  ${ratingButtonStyle(voteRoles)}
                 >${rating}</button>
               `;
               }).join("")}
@@ -544,7 +597,8 @@ function uploadCardTemplate() {
 }
 
 function normalizeSavedText(key, value) {
-  if (key === "title" && value === "Logo review") return "Images review";
+  if (key === "title" && value === "Logo review") return "ANÓTHER DIMENSION VOTING BOOTH";
+  if (key === "title" && value === "Images review") return "ANÓTHER DIMENSION VOTING BOOTH";
   return value;
 }
 
@@ -575,20 +629,33 @@ function inviteUrl(project) {
   return `${window.location.origin}${window.location.pathname}?project=${encodeURIComponent(project.id)}`;
 }
 
-function inviteHref(project) {
+function inviteHref(project, target = "client") {
+  const targetName = target === "voter3" ? project.voterName : project.clientName;
+  const targetEmail = target === "voter3" ? project.voterEmail : project.clientEmail;
+  const targetPassword = target === "voter3" ? project.voterPassword : project.clientPassword;
   const subject = `Uitnodiging voor ${project.title}`;
   const body = [
     `Je kunt inloggen op de rating page voor ${project.title}:`,
     inviteUrl(project),
     "",
-    `Naam: ${project.clientName || ""}`,
-    `Wachtwoord: ${project.clientPassword || ""}`,
+    `Naam: ${targetName || ""}`,
+    `Wachtwoord: ${targetPassword || ""}`,
   ].join("\n");
-  return `mailto:${encodeURIComponent(project.clientEmail || "")}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  return `mailto:${encodeURIComponent(targetEmail || "")}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+function renderSheetProjectOptions() {
+  sheetProjectSelect.innerHTML = currentProjects.map((project) => (
+    `<option value="${escapeHtml(project.id)}">${escapeHtml(project.title)}</option>`
+  )).join("");
+  sheetProjectSelect.disabled = !currentProjects.length;
+  sheetPickButton.disabled = !currentProjects.length;
+  sheetCutButton.disabled = !currentProjects.length;
 }
 
 function renderProjectList() {
   newProjectForm.hidden = false;
+  renderSheetProjectOptions();
   if (!currentProjects.length) {
     projectList.innerHTML = '<p class="project-empty">Geen projecten voor deze login.</p>';
     return;
@@ -602,6 +669,7 @@ function renderProjectList() {
       ${project.canManage ? `
         <div class="project-actions">
           <a class="project-invite" href="${escapeHtml(inviteHref(project))}">Nodig klant uit</a>
+          ${project.voterName ? `<a class="project-invite project-invite-voter3" href="${escapeHtml(inviteHref(project, "voter3"))}">Nodig voter 3 uit</a>` : ""}
           ${project.baseAssets ? "" : `<button class="project-delete" type="button" data-project-delete="${escapeHtml(project.id)}" aria-label="Project verwijderen">☠️</button>`}
         </div>
       ` : ""}
@@ -818,6 +886,484 @@ async function addFiles(files) {
   saveReview();
   schedulePersist({ addedItems: addedPatch, review: reviewPatch });
   render();
+}
+
+function resetSheetCutter() {
+  sheetImage = null;
+  sheetImageName = "";
+  sheetBoxes = [];
+  sheetPointer = null;
+  sheetStage.hidden = true;
+  sheetResetButton.hidden = true;
+  sheetCutButton.hidden = true;
+  sheetStatus.textContent = "";
+  sheetContext.clearRect(0, 0, sheetCanvas.width, sheetCanvas.height);
+}
+
+function averageCornerColor(data, width, height) {
+  const points = [
+    [4, 4],
+    [width - 5, 4],
+    [4, height - 5],
+    [width - 5, height - 5],
+  ];
+  const color = [0, 0, 0];
+  points.forEach(([x, y]) => {
+    const index = (Math.max(0, Math.min(height - 1, y)) * width + Math.max(0, Math.min(width - 1, x))) * 4;
+    color[0] += data[index];
+    color[1] += data[index + 1];
+    color[2] += data[index + 2];
+  });
+  return color.map((value) => value / points.length);
+}
+
+function dilateMask(mask, width, height, rounds = 2) {
+  let current = mask;
+  for (let round = 0; round < rounds; round += 1) {
+    const next = new Uint8Array(current);
+    for (let y = 1; y < height - 1; y += 1) {
+      for (let x = 1; x < width - 1; x += 1) {
+        const index = y * width + x;
+        if (current[index]) continue;
+        if (current[index - 1] || current[index + 1] || current[index - width] || current[index + width]) next[index] = 1;
+      }
+    }
+    current = next;
+  }
+  return current;
+}
+
+function boxesNear(a, b, gap) {
+  return !(
+    a.x + a.width + gap < b.x ||
+    b.x + b.width + gap < a.x ||
+    a.y + a.height + gap < b.y ||
+    b.y + b.height + gap < a.y
+  );
+}
+
+function mergeBoxes(boxes, gap) {
+  const merged = [...boxes];
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let i = 0; i < merged.length; i += 1) {
+      for (let j = i + 1; j < merged.length; j += 1) {
+        if (!boxesNear(merged[i], merged[j], gap)) continue;
+        const x = Math.min(merged[i].x, merged[j].x);
+        const y = Math.min(merged[i].y, merged[j].y);
+        const right = Math.max(merged[i].x + merged[i].width, merged[j].x + merged[j].width);
+        const bottom = Math.max(merged[i].y + merged[i].height, merged[j].y + merged[j].height);
+        merged[i] = { x, y, width: right - x, height: bottom - y };
+        merged.splice(j, 1);
+        changed = true;
+        break;
+      }
+      if (changed) break;
+    }
+  }
+  return merged;
+}
+
+function projectionRuns(projection, threshold, minRun, maxInnerGap) {
+  const raw = [];
+  let start = null;
+  projection.forEach((value, index) => {
+    if (value > threshold && start === null) start = index;
+    if ((value <= threshold || index === projection.length - 1) && start !== null) {
+      const end = value <= threshold ? index - 1 : index;
+      raw.push({ start, end });
+      start = null;
+    }
+  });
+  const merged = [];
+  raw.forEach((run) => {
+    const previous = merged[merged.length - 1];
+    if (previous && run.start - previous.end <= maxInnerGap) previous.end = run.end;
+    else merged.push({ ...run });
+  });
+  return merged.filter((run) => run.end - run.start + 1 >= minRun);
+}
+
+function projectionSheetBoxes(mask, width, height, image, scale) {
+  const rowProjection = Array.from({ length: height }, (_, y) => {
+    let total = 0;
+    for (let x = 0; x < width; x += 1) total += mask[y * width + x];
+    return total;
+  });
+  const rowRuns = projectionRuns(
+    rowProjection,
+    Math.max(5, width * 0.008),
+    Math.max(18, height * 0.055),
+    Math.max(10, height * 0.035),
+  );
+  const boxes = [];
+  rowRuns.forEach((row) => {
+    const columnProjection = Array.from({ length: width }, (_, x) => {
+      let total = 0;
+      for (let y = row.start; y <= row.end; y += 1) total += mask[y * width + x];
+      return total;
+    });
+    const columnRuns = projectionRuns(
+      columnProjection,
+      Math.max(3, (row.end - row.start + 1) * 0.012),
+      Math.max(14, width * 0.025),
+      Math.max(10, width * 0.018),
+    );
+    columnRuns.forEach((column) => {
+      let minX = width;
+      let minY = height;
+      let maxX = 0;
+      let maxY = 0;
+      let area = 0;
+      for (let y = row.start; y <= row.end; y += 1) {
+        for (let x = column.start; x <= column.end; x += 1) {
+          if (!mask[y * width + x]) continue;
+          area += 1;
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+        }
+      }
+      if (area < Math.max(120, width * height * 0.00018)) return;
+      const pad = 18;
+      boxes.push({
+        x: Math.max(0, Math.round((minX - pad) / scale)),
+        y: Math.max(0, Math.round((minY - pad) / scale)),
+        width: Math.min(image.naturalWidth, Math.round((maxX - minX + pad * 2) / scale)),
+        height: Math.min(image.naturalHeight, Math.round((maxY - minY + pad * 2) / scale)),
+      });
+    });
+  });
+  return sortBoxesReadingOrder(boxes.filter((box) => box.width > 32 && box.height > 32)).slice(0, 80);
+}
+
+function gridSheetBoxes(mask, width, height, image, scale) {
+  const columns = Math.max(2, Math.min(8, Math.round(image.naturalWidth / 275)));
+  const rows = Math.max(2, Math.min(6, Math.round(image.naturalHeight / 260)));
+  const boxes = [];
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < columns; column += 1) {
+      const left = Math.floor((column / columns) * width);
+      const right = Math.ceil(((column + 1) / columns) * width);
+      const top = Math.floor((row / rows) * height);
+      const bottom = Math.ceil(((row + 1) / rows) * height);
+      let minX = width;
+      let minY = height;
+      let maxX = 0;
+      let maxY = 0;
+      let area = 0;
+      for (let y = top; y < bottom; y += 1) {
+        for (let x = left; x < right; x += 1) {
+          if (!mask[y * width + x]) continue;
+          area += 1;
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+        }
+      }
+      if (area < Math.max(120, width * height * 0.00018)) continue;
+      const pad = 18;
+      boxes.push({
+        x: Math.max(0, Math.round((minX - pad) / scale)),
+        y: Math.max(0, Math.round((minY - pad) / scale)),
+        width: Math.min(image.naturalWidth, Math.round((maxX - minX + pad * 2) / scale)),
+        height: Math.min(image.naturalHeight, Math.round((maxY - minY + pad * 2) / scale)),
+      });
+    }
+  }
+  return sortBoxesReadingOrder(boxes.filter((box) => box.width > 32 && box.height > 32)).slice(0, 80);
+}
+
+function sortBoxesReadingOrder(boxes) {
+  const sorted = [...boxes].sort((a, b) => ((a.y + a.height / 2) - (b.y + b.height / 2)));
+  const rows = [];
+  sorted.forEach((box) => {
+    const centerY = box.y + box.height / 2;
+    const row = rows.find((item) => Math.abs(centerY - item.centerY) < Math.max(40, box.height * 0.55));
+    if (row) {
+      row.boxes.push(box);
+      row.centerY = row.boxes.reduce((sum, item) => sum + item.y + item.height / 2, 0) / row.boxes.length;
+    } else {
+      rows.push({ centerY, boxes: [box] });
+    }
+  });
+  return rows
+    .sort((a, b) => a.centerY - b.centerY)
+    .flatMap((row) => row.boxes.sort((a, b) => a.x - b.x));
+}
+
+function detectSheetBoxes(image) {
+  const maxSide = 920;
+  const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  context.drawImage(image, 0, 0, width, height);
+  const pixels = context.getImageData(0, 0, width, height);
+  const background = averageCornerColor(pixels.data, width, height);
+  const mask = new Uint8Array(width * height);
+  for (let index = 0; index < width * height; index += 1) {
+    const pixel = index * 4;
+    const diff = Math.abs(pixels.data[pixel] - background[0])
+      + Math.abs(pixels.data[pixel + 1] - background[1])
+      + Math.abs(pixels.data[pixel + 2] - background[2]);
+    if (pixels.data[pixel + 3] > 24 && diff > 78) mask[index] = 1;
+  }
+  const projected = projectionSheetBoxes(mask, width, height, image, scale);
+  const grid = gridSheetBoxes(mask, width, height, image, scale);
+  if (projected.length > 3 && projected.length >= grid.length * 0.7) return projected;
+  if (grid.length > projected.length) return grid;
+  const dilated = dilateMask(mask, width, height, 1);
+  const visited = new Uint8Array(width * height);
+  const components = [];
+  const minArea = Math.max(220, Math.round(width * height * 0.00045));
+  for (let start = 0; start < dilated.length; start += 1) {
+    if (!dilated[start] || visited[start]) continue;
+    const stack = [start];
+    visited[start] = 1;
+    let minX = width;
+    let minY = height;
+    let maxX = 0;
+    let maxY = 0;
+    let area = 0;
+    while (stack.length) {
+      const current = stack.pop();
+      const x = current % width;
+      const y = Math.floor(current / width);
+      area += 1;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+      const neighbors = [current - 1, current + 1, current - width, current + width];
+      neighbors.forEach((next) => {
+        if (next < 0 || next >= dilated.length || visited[next] || !dilated[next]) return;
+        if ((current % width === 0 && next === current - 1) || (current % width === width - 1 && next === current + 1)) return;
+        visited[next] = 1;
+        stack.push(next);
+      });
+    }
+    if (area < minArea || maxX - minX < 12 || maxY - minY < 12) continue;
+    const pad = Math.round(14 * scale);
+    components.push({
+      x: Math.max(0, (minX - pad) / scale),
+      y: Math.max(0, (minY - pad) / scale),
+      width: Math.min(image.naturalWidth, (maxX - minX + pad * 2) / scale),
+      height: Math.min(image.naturalHeight, (maxY - minY + pad * 2) / scale),
+    });
+  }
+  const gap = Math.max(image.naturalWidth, image.naturalHeight) * 0.006;
+  const merged = mergeBoxes(components, gap).map((box) => ({
+    x: Math.max(0, Math.round(box.x)),
+    y: Math.max(0, Math.round(box.y)),
+    width: Math.min(image.naturalWidth - box.x, Math.round(box.width)),
+    height: Math.min(image.naturalHeight - box.y, Math.round(box.height)),
+  })).filter((box) => box.width > 28 && box.height > 28);
+  if (!merged.length) return [{ x: 0, y: 0, width: image.naturalWidth, height: image.naturalHeight }];
+  return sortBoxesReadingOrder(merged).slice(0, 80);
+}
+
+function resizeSheetCanvas() {
+  const bounds = sheetCanvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  sheetCanvas.width = Math.max(560, Math.round((bounds.width || 840) * dpr));
+  sheetCanvas.height = Math.max(360, Math.round((bounds.height || 520) * dpr));
+}
+
+function calculateSheetImageRect() {
+  const canvasRatio = sheetCanvas.width / sheetCanvas.height;
+  const imageRatio = sheetImage.naturalWidth / sheetImage.naturalHeight;
+  let width;
+  let height;
+  if (imageRatio > canvasRatio) {
+    width = sheetCanvas.width;
+    height = width / imageRatio;
+  } else {
+    height = sheetCanvas.height;
+    width = height * imageRatio;
+  }
+  return {
+    x: (sheetCanvas.width - width) / 2,
+    y: (sheetCanvas.height - height) / 2,
+    width,
+    height,
+    scale: width / sheetImage.naturalWidth,
+  };
+}
+
+function sheetBoxToCanvasRect(box) {
+  return {
+    x: sheetImageRect.x + box.x * sheetImageRect.scale,
+    y: sheetImageRect.y + box.y * sheetImageRect.scale,
+    width: box.width * sheetImageRect.scale,
+    height: box.height * sheetImageRect.scale,
+  };
+}
+
+function drawSheetCutter() {
+  sheetContext.clearRect(0, 0, sheetCanvas.width, sheetCanvas.height);
+  sheetContext.fillStyle = "#f4f1ea";
+  sheetContext.fillRect(0, 0, sheetCanvas.width, sheetCanvas.height);
+  if (!sheetImage) return;
+  sheetImageRect = calculateSheetImageRect();
+  sheetContext.drawImage(sheetImage, sheetImageRect.x, sheetImageRect.y, sheetImageRect.width, sheetImageRect.height);
+  sheetBoxes.forEach((box, index) => {
+    const rect = sheetBoxToCanvasRect(box);
+    sheetContext.strokeStyle = "#ff1d1d";
+    sheetContext.lineWidth = 3;
+    sheetContext.strokeRect(rect.x, rect.y, rect.width, rect.height);
+    sheetContext.fillStyle = "#ff1d1d";
+    sheetHandlePoints(rect).forEach(({ x, y }) => {
+      sheetContext.beginPath();
+      sheetContext.arc(x, y, 8, 0, Math.PI * 2);
+      sheetContext.fill();
+    });
+    sheetContext.fillStyle = "rgba(255, 29, 29, 0.88)";
+    sheetContext.fillRect(rect.x, rect.y, 26, 20);
+    sheetContext.fillStyle = "#ffffff";
+    sheetContext.font = "700 13px system-ui";
+    sheetContext.fillText(String(index + 1), rect.x + 8, rect.y + 14);
+  });
+}
+
+function sheetHandlePoints(rect) {
+  return [
+    { name: "nw", x: rect.x, y: rect.y },
+    { name: "ne", x: rect.x + rect.width, y: rect.y },
+    { name: "sw", x: rect.x, y: rect.y + rect.height },
+    { name: "se", x: rect.x + rect.width, y: rect.y + rect.height },
+  ];
+}
+
+function getSheetPoint(event) {
+  const bounds = sheetCanvas.getBoundingClientRect();
+  return {
+    x: ((event.clientX - bounds.left) / bounds.width) * sheetCanvas.width,
+    y: ((event.clientY - bounds.top) / bounds.height) * sheetCanvas.height,
+  };
+}
+
+function hitTestSheet(point) {
+  for (let index = sheetBoxes.length - 1; index >= 0; index -= 1) {
+    const rect = sheetBoxToCanvasRect(sheetBoxes[index]);
+    const handle = sheetHandlePoints(rect).find((item) => Math.hypot(item.x - point.x, item.y - point.y) < 18);
+    if (handle) return { index, mode: "resize", handle: handle.name };
+    if (point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height) {
+      return { index, mode: "move" };
+    }
+  }
+  return null;
+}
+
+function clampSheetBox(box) {
+  const next = { ...box };
+  next.width = Math.max(24, Math.min(sheetImage.naturalWidth, next.width));
+  next.height = Math.max(24, Math.min(sheetImage.naturalHeight, next.height));
+  next.x = Math.max(0, Math.min(sheetImage.naturalWidth - next.width, next.x));
+  next.y = Math.max(0, Math.min(sheetImage.naturalHeight - next.height, next.y));
+  return next;
+}
+
+function updateSheetBoxFromPointer(event) {
+  if (!sheetPointer || !sheetImage) return;
+  const point = getSheetPoint(event);
+  const dx = (point.x - sheetPointer.startPoint.x) / sheetImageRect.scale;
+  const dy = (point.y - sheetPointer.startPoint.y) / sheetImageRect.scale;
+  let next = { ...sheetPointer.startBox };
+  if (sheetPointer.mode === "move") {
+    next.x += dx;
+    next.y += dy;
+  } else {
+    if (sheetPointer.handle.includes("w")) {
+      next.x += dx;
+      next.width -= dx;
+    }
+    if (sheetPointer.handle.includes("e")) next.width += dx;
+    if (sheetPointer.handle.includes("n")) {
+      next.y += dy;
+      next.height -= dy;
+    }
+    if (sheetPointer.handle.includes("s")) next.height += dy;
+  }
+  sheetBoxes[sheetPointer.index] = clampSheetBox(next);
+  drawSheetCutter();
+}
+
+async function loadSheetFile(file) {
+  sheetStatus.textContent = "";
+  const dataUrl = await readFileAsDataUrl(file);
+  const image = await loadImageFromUrl(dataUrl);
+  sheetImage = image;
+  sheetImageName = file.name || "sheet";
+  sheetBoxes = detectSheetBoxes(image);
+  sheetStage.hidden = false;
+  sheetResetButton.hidden = false;
+  sheetCutButton.hidden = false;
+  setTimeout(() => {
+    resizeSheetCanvas();
+    drawSheetCutter();
+    sheetStatus.textContent = `${sheetBoxes.length} vakken gevonden.`;
+  }, 0);
+}
+
+function makeSheetCutDataUrl(box) {
+  const output = document.createElement("canvas");
+  const maxSide = 1200;
+  const scale = Math.min(1, maxSide / Math.max(box.width, box.height));
+  output.width = Math.max(1, Math.round(box.width * scale));
+  output.height = Math.max(1, Math.round(box.height * scale));
+  const context = output.getContext("2d");
+  context.imageSmoothingQuality = "high";
+  context.drawImage(sheetImage, box.x, box.y, box.width, box.height, 0, 0, output.width, output.height);
+  return output.toDataURL("image/jpeg", 0.92);
+}
+
+async function cutSheetIntoProject() {
+  if (!sheetImage || !sheetBoxes.length) return;
+  const projectId = sheetProjectSelect.value;
+  const project = currentProjects.find((item) => item.id === projectId);
+  if (!project) {
+    sheetStatus.textContent = "Kies een project.";
+    return;
+  }
+  sheetCutButton.disabled = true;
+  const stamp = Date.now();
+  const addedPatch = {};
+  sortBoxesReadingOrder(sheetBoxes)
+    .forEach((box, index) => {
+      const id = `sheet-${stamp}-${index + 1}-${Math.random().toString(36).slice(2, 7)}`;
+      addedPatch[id] = {
+        id,
+        file: id,
+        name: `${sheetImageName} #${index + 1}`,
+        source: sheetImageName,
+        sourceIndex: "✂",
+        dotIndex: String(index + 1),
+        group: "TOEGEVOEGD",
+        added: true,
+        type: "image/jpeg",
+        dataUrl: makeSheetCutDataUrl(clampSheetBox(box)),
+      };
+    });
+  const response = await fetch(`/api/state?project=${encodeURIComponent(projectId)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ addedItems: addedPatch }),
+  });
+  sheetCutButton.disabled = false;
+  if (!response.ok) {
+    sheetStatus.textContent = "Sheet snijden mislukte.";
+    return;
+  }
+  resetSheetCutter();
+  activeProject = project;
+  await openProject(projectId);
 }
 
 function openCropper(logo) {
@@ -1059,7 +1605,7 @@ controls.addEventListener("click", (event) => {
   setActiveFilter(button.dataset.filter);
 });
 
-[addedFilter, deletedFilter, clientVoteFilter, adminVoteFilter].forEach((button) => {
+[addedFilter, deletedFilter, clientVoteFilter, adminVoteFilter, voter3VoteFilter].forEach((button) => {
   button.addEventListener("click", () => {
     setActiveFilter(activeFilter === button.dataset.filter ? "all" : button.dataset.filter);
   });
@@ -1218,6 +1764,31 @@ addFileInput.addEventListener("change", async () => {
   addFileInput.value = "";
 });
 
+sheetPickButton.addEventListener("click", () => sheetFileInput.click());
+sheetFileInput.addEventListener("change", async () => {
+  if (sheetFileInput.files?.[0]) await loadSheetFile(sheetFileInput.files[0]);
+  sheetFileInput.value = "";
+});
+sheetResetButton.addEventListener("click", resetSheetCutter);
+sheetCutButton.addEventListener("click", cutSheetIntoProject);
+
+sheetCanvas.addEventListener("pointerdown", (event) => {
+  if (!sheetImage) return;
+  const startPoint = getSheetPoint(event);
+  const hit = hitTestSheet(startPoint);
+  if (!hit) return;
+  sheetCanvas.setPointerCapture(event.pointerId);
+  sheetPointer = { ...hit, startPoint, startBox: { ...sheetBoxes[hit.index] } };
+});
+
+sheetCanvas.addEventListener("pointermove", updateSheetBoxFromPointer);
+sheetCanvas.addEventListener("pointerup", () => {
+  sheetPointer = null;
+});
+sheetCanvas.addEventListener("pointercancel", () => {
+  sheetPointer = null;
+});
+
 cropCanvas.addEventListener("pointerdown", (event) => {
   if (!activeImage) return;
   cropCanvas.setPointerCapture(event.pointerId);
@@ -1285,6 +1856,12 @@ window.addEventListener("resize", () => {
   drawCropper();
 });
 
+window.addEventListener("resize", () => {
+  if (!sheetImage || sheetStage.hidden) return;
+  resizeSheetCanvas();
+  drawSheetCutter();
+});
+
 toggleTextEdit.addEventListener("click", () => setTextEditMode(true));
 saveTextEdit.addEventListener("click", () => {
   const text = currentTextValues();
@@ -1334,6 +1911,9 @@ newProjectForm.addEventListener("submit", async (event) => {
     clientName: newProjectClient.value.trim(),
     clientEmail: newProjectEmail.value.trim(),
     clientPassword: newProjectPassword.value,
+    voterName: newProjectVoter.value.trim(),
+    voterEmail: newProjectVoterEmail.value.trim(),
+    voterPassword: newProjectVoterPassword.value,
   };
   const response = await fetch("/api/projects", {
     method: "POST",

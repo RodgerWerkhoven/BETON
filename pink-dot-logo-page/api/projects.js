@@ -1,3 +1,4 @@
+const { del, list } = require("@vercel/blob");
 const { verifySession, getDirectory, saveDirectory, projectsForUser, canManageProject } = require("./auth-lib");
 
 const RODGER_NOTIFY_EMAIL = process.env.RODGER_NOTIFY_EMAIL || "rodgerwerkhoven@gmail.com";
@@ -28,6 +29,9 @@ function publicProject(project, session) {
     clientName: project.clientName || "",
     clientEmail: project.clientEmail || "",
     clientPassword: canManage ? project.clientPassword || "" : "",
+    voterName: project.voterName || "",
+    voterEmail: project.voterEmail || "",
+    voterPassword: canManage ? project.voterPassword || "" : "",
     members: project.members || [],
     createdAt: project.createdAt,
     canManage,
@@ -62,18 +66,33 @@ function isMemberElsewhere(directory, projectId, clientName) {
   ));
 }
 
+async function deleteProjectBlobs(projectId) {
+  const paths = [`clients/${projectId}/review-state.json`];
+  try {
+    const uploads = await list({ prefix: `uploads/${projectId}/`, limit: 1000 });
+    paths.push(...(uploads.blobs || []).map((blob) => blob.pathname));
+  } catch (error) {
+    console.error("Project upload cleanup listing failed", error);
+  }
+  try {
+    await del(paths);
+  } catch (error) {
+    console.error("Project blob cleanup failed", error);
+  }
+}
+
 async function sendRodgerProjectNotification(req, project, creator) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     console.warn(`Project notification skipped: RESEND_API_KEY missing for ${project.id}`);
     return { sent: false, reason: "RESEND_API_KEY missing" };
   }
-  const from = process.env.RESEND_FROM_EMAIL || "RODGER'S CONTENT CURATOR <onboarding@resend.dev>";
+  const from = process.env.RESEND_FROM_EMAIL || "ANÓTHER DIMENSION VOTING BOOTH <onboarding@resend.dev>";
   const url = projectUrl(req, project);
-  const subject = `Nieuwe rating page: ${project.title}`;
+  const subject = `Nieuwe voting booth: ${project.title}`;
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.45; color: #111;">
-      <h1 style="font-size: 22px;">Nieuwe rating page aangemaakt</h1>
+      <h1 style="font-size: 22px;">Nieuwe voting booth aangemaakt</h1>
       <p><strong>Project:</strong> ${escapeHtml(project.title)}</p>
       <p><strong>Aangemaakt door:</strong> ${escapeHtml(creator.label || creator.client)}</p>
       <p><strong>Genodigde:</strong> ${escapeHtml(project.clientName || "")}${project.clientEmail ? ` &lt;${escapeHtml(project.clientEmail)}&gt;` : ""}</p>
@@ -121,7 +140,11 @@ module.exports = async function handler(req, res) {
       const clientName = String(body.clientName || "").trim();
       const clientPassword = String(body.clientPassword || "").trim();
       const clientEmail = String(body.clientEmail || "").trim();
+      const voterName = String(body.voterName || "").trim();
+      const voterPassword = String(body.voterPassword || "").trim();
+      const voterEmail = String(body.voterEmail || "").trim();
       if (!title || !clientName || !clientPassword) return res.status(400).json({ error: "Project, klantnaam en wachtwoord zijn verplicht" });
+      if ((voterName || voterPassword || voterEmail) && (!voterName || !voterPassword)) return res.status(400).json({ error: "Derde voter heeft naam en wachtwoord nodig" });
 
       let id = slug(title);
       let suffix = 2;
@@ -136,7 +159,15 @@ module.exports = async function handler(req, res) {
         role: "client",
         email: clientEmail,
       };
-      const members = [...new Set([clientName, session.client, "Rodger"].filter(Boolean))];
+      if (voterName) {
+        directory.users[voterName] = {
+          password: voterPassword,
+          label: voterName,
+          role: "voter3",
+          email: voterEmail,
+        };
+      }
+      const members = [...new Set([clientName, voterName, session.client, "Rodger"].filter(Boolean))];
       directory.projects[id] = {
         id,
         title,
@@ -144,6 +175,9 @@ module.exports = async function handler(req, res) {
         clientName,
         clientEmail,
         clientPassword,
+        voterName,
+        voterEmail,
+        voterPassword,
         members,
         baseAssets: false,
         createdAt: new Date().toISOString(),
@@ -167,9 +201,10 @@ module.exports = async function handler(req, res) {
       if (!canManageProject(project, session)) return res.status(403).json({ error: "Geen rechten om dit project te verwijderen" });
 
       delete directory.projects[projectId];
-      if (project.clientName && project.clientName !== "Rodger" && !isMemberElsewhere(directory, projectId, project.clientName)) {
-        delete directory.users[project.clientName];
-      }
+      [project.clientName, project.voterName].filter(Boolean).forEach((member) => {
+        if (member !== "Rodger" && member !== project.owner && !isMemberElsewhere(directory, projectId, member)) delete directory.users[member];
+      });
+      await deleteProjectBlobs(projectId);
       await saveDirectory(directory);
       return res.status(200).json({ deleted: true, id: projectId });
     }

@@ -4,19 +4,21 @@ const { get, put } = require("@vercel/blob");
 const CLIENTS = {
   Alien: { password: "Beton", label: "Alien", role: "client" },
   Rodger: { password: "Beton", label: "Rodger", role: "admin" },
+  Voter3: { password: "Beton", label: "Voter 3", role: "voter3" },
 };
 
 const DEFAULT_DIRECTORY = {
   users: {
     Rodger: { password: "Beton", label: "Rodger", role: "admin" },
     Alien: { password: "Beton", label: "Alien", role: "client" },
+    Voter3: { password: "Beton", label: "Voter 3", role: "voter3" },
   },
   projects: {
     Alien: {
       id: "Alien",
       title: "BETON",
       owner: "Rodger",
-      members: ["Alien", "Rodger"],
+      members: ["Alien", "Rodger", "Voter3"],
       baseAssets: true,
       createdAt: "2026-06-20T00:00:00.000Z",
     },
@@ -60,10 +62,11 @@ async function getDirectory() {
     const result = await get("directory.json", { access: "private", useCache: false });
     if (!result || result.statusCode !== 200 || !result.stream) return structuredClone(DEFAULT_DIRECTORY);
     const directory = JSON.parse(await streamToString(result.stream));
-    return {
+    const merged = {
       users: { ...DEFAULT_DIRECTORY.users, ...(directory.users || {}) },
       projects: { ...DEFAULT_DIRECTORY.projects, ...(directory.projects || {}) },
     };
+    return normalizeDirectory(merged);
   } catch (error) {
     if (error?.name === "BlobNotFoundError") return structuredClone(DEFAULT_DIRECTORY);
     return structuredClone(DEFAULT_DIRECTORY);
@@ -76,10 +79,21 @@ function ensureRodgerMembership(project) {
   return { ...project, members: [...members] };
 }
 
-async function saveDirectory(directory) {
+function normalizeDirectory(directory) {
   Object.entries(directory.projects || {}).forEach(([id, project]) => {
-    directory.projects[id] = ensureRodgerMembership(project);
+    let normalized = ensureRodgerMembership(project);
+    if (id === "Alien") {
+      const members = new Set(normalized.members || []);
+      members.add("Voter3");
+      normalized = { ...normalized, members: [...members], baseAssets: true };
+    }
+    directory.projects[id] = normalized;
   });
+  return directory;
+}
+
+async function saveDirectory(directory) {
+  normalizeDirectory(directory);
   await put("directory.json", JSON.stringify(directory), {
     access: "private",
     allowOverwrite: true,

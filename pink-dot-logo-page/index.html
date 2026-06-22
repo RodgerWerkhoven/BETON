@@ -3,14 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ANÓTHER DIMENSION VOTING BOOTH</title>
+    <title>ANÓTHER DIMENSION CONTENT CURATOR</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <section id="loginView" class="login-view" hidden>
       <form id="loginForm" class="login-panel">
         <p class="eyebrow">ANÓTHER DIMENSION</p>
-        <h1>VOTING BOOTH</h1>
+        <h1>CONTENT CURATOR</h1>
         <label>
           <span>Naam</span>
           <input id="loginName" name="name" autocomplete="username" required />
@@ -28,44 +28,34 @@
       <header class="project-head">
         <div>
           <p class="eyebrow">ANÓTHER DIMENSION</p>
-          <h1>VOTING BOOTH</h1>
+          <h1>CONTENT CURATOR</h1>
         </div>
         <button id="projectLogoutButton" type="button">Uitloggen</button>
       </header>
       <main class="project-main">
         <section class="project-list" id="projectList" aria-label="Projecten"></section>
         <aside class="project-tools">
+          <button id="newProjectToggle" class="new-project-toggle" type="button" aria-expanded="false">Maak project</button>
           <form id="newProjectForm" class="new-project-form" hidden>
             <p class="eyebrow">Nieuw project</p>
             <label>
-              <span>Projectnaam</span>
-              <input id="newProjectTitle" name="title" autocomplete="off" />
+              <span>NAAM PROJECT:</span>
+              <input id="newProjectTitle" name="title" autocomplete="off" placeholder="vul hier naam in" />
             </label>
             <label>
-              <span>Klantnaam</span>
-              <input id="newProjectClient" name="clientName" autocomplete="off" />
+              <span>PASSWORD PROJECT:</span>
+              <input id="newProjectPassword" name="projectPassword" autocomplete="new-password" placeholder="maak password aan" />
             </label>
             <label>
-              <span>Klant e-mail</span>
-              <input id="newProjectEmail" name="clientEmail" type="email" autocomplete="email" />
+              <span>E-MAILS ANDERE CURATOREN:</span>
+              <input id="newProjectCuratorEmailA" name="curatorEmailA" type="email" autocomplete="email" placeholder="vul hier e-mail in" />
             </label>
             <label>
-              <span>Wachtwoord</span>
-              <input id="newProjectPassword" name="clientPassword" autocomplete="new-password" />
+              <span>E-MAILS ANDERE CURATOREN:</span>
+              <input id="newProjectCuratorEmailB" name="curatorEmailB" type="email" autocomplete="email" placeholder="vul hier e-mail in" />
             </label>
-            <label>
-              <span>Derde voter</span>
-              <input id="newProjectVoter" name="voterName" autocomplete="off" />
-            </label>
-            <label>
-              <span>Derde voter e-mail</span>
-              <input id="newProjectVoterEmail" name="voterEmail" type="email" autocomplete="email" />
-            </label>
-            <label>
-              <span>Derde voter wachtwoord</span>
-              <input id="newProjectVoterPassword" name="voterPassword" autocomplete="new-password" />
-            </label>
-            <button type="submit">Maak project</button>
+            <button type="submit">VERSTUUR UITNODIGING(EN)</button>
+            <button id="copyNewProjectLink" type="button" disabled>COPY PROJECT LINK</button>
             <p id="newProjectError" class="login-error" role="alert"></p>
           </form>
         </aside>
@@ -75,9 +65,9 @@
     <div id="appView" hidden>
     <header class="topbar">
       <div class="title-block">
-        <p class="eyebrow">ANÓTHER DIMENSION VOTING BOOTH</p>
+        <p class="eyebrow">ANÓTHER DIMENSION CONTENT CURATOR</p>
         <div class="title-row">
-          <h1 data-edit-key="title">ANÓTHER DIMENSION VOTING BOOTH</h1>
+          <h1 data-edit-key="title">ANÓTHER DIMENSION CONTENT CURATOR</h1>
           <section class="text-tools" aria-label="Naam bewerken">
             <button id="toggleTextEdit" type="button">Naam wijzigen</button>
             <button id="saveTextEdit" type="button" hidden>Naam opslaan</button>

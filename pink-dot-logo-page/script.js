@@ -9,14 +9,13 @@ const logoutButton = document.querySelector("#logoutButton");
 const projectLogoutButton = document.querySelector("#projectLogoutButton");
 const projectOverviewButton = document.querySelector("#projectOverviewButton");
 const projectList = document.querySelector("#projectList");
+const newProjectToggle = document.querySelector("#newProjectToggle");
 const newProjectForm = document.querySelector("#newProjectForm");
 const newProjectTitle = document.querySelector("#newProjectTitle");
-const newProjectClient = document.querySelector("#newProjectClient");
-const newProjectEmail = document.querySelector("#newProjectEmail");
 const newProjectPassword = document.querySelector("#newProjectPassword");
-const newProjectVoter = document.querySelector("#newProjectVoter");
-const newProjectVoterEmail = document.querySelector("#newProjectVoterEmail");
-const newProjectVoterPassword = document.querySelector("#newProjectVoterPassword");
+const newProjectCuratorEmailA = document.querySelector("#newProjectCuratorEmailA");
+const newProjectCuratorEmailB = document.querySelector("#newProjectCuratorEmailB");
+const copyNewProjectLink = document.querySelector("#copyNewProjectLink");
 const newProjectError = document.querySelector("#newProjectError");
 const voteButtons = document.querySelector("#voteButtons");
 const sheetDialog = document.querySelector("#sheetDialog");
@@ -70,6 +69,7 @@ const voterPalette = [
   { id: "yellow", color: "#ffd85a" },
 ];
 const rodgerVoterColor = { id: "pink", color: "#ff30d6" };
+const sheetBoxPalette = ["#ff1d1d", "#60d46f", "#ff30d6", "#2d9cff"];
 const defaults = Object.fromEntries(editableTextNodes.map((node) => [node.dataset.editKey, node.textContent]));
 let activeProjectId = new URLSearchParams(window.location.search).get("project") || "Alien";
 
@@ -99,6 +99,7 @@ let sheetBoxes = [];
 let sheetImageRect = { x: 0, y: 0, width: 1, height: 1, scale: 1 };
 let sheetPointer = null;
 let activeSheetLogo = null;
+let lastCreatedProject = null;
 
 function showLogin(message = "") {
   loginView.hidden = false;
@@ -674,8 +675,8 @@ function render() {
               </label>
             </div>
             <div class="card-actions">
-              ${croppable ? `<button class="edit-logo" type="button" data-id="${logo.id}" aria-label="Bijsnijden">✂️</button>` : ""}
-              ${croppable && logo.added ? `<button class="sheet-logo" type="button" data-action="sheet-cut" data-id="${logo.id}" aria-label="Sheet cut-up">🪚</button>` : ""}
+              ${croppable ? `<button class="edit-logo" type="button" data-id="${logo.id}" aria-label="Bijsnijden">🪚</button>` : ""}
+              ${croppable && logo.added ? `<button class="sheet-logo" type="button" data-action="sheet-cut" data-id="${logo.id}" aria-label="Sheet cut-up">✂️</button>` : ""}
               <button class="undo-card" type="button" data-action="undo" data-id="${logo.id}" ${cropHistory[logoStateKey(logo)]?.length ? "" : "disabled"}>↩️</button>
               <button class="delete-logo ${review.deleted ? "is-restore" : ""}" type="button" data-action="delete" data-id="${logo.id}">${review.deleted ? "Herstel" : "☠️"}</button>
             </div>
@@ -710,8 +711,9 @@ function uploadCardTemplate() {
 }
 
 function normalizeSavedText(key, value) {
-  if (key === "title" && value === "Logo review") return "ANÓTHER DIMENSION VOTING BOOTH";
-  if (key === "title" && value === "Images review") return "ANÓTHER DIMENSION VOTING BOOTH";
+  if (key === "title" && value === "Logo review") return "ANÓTHER DIMENSION CONTENT CURATOR";
+  if (key === "title" && value === "Images review") return "ANÓTHER DIMENSION CONTENT CURATOR";
+  if (key === "title" && value === "ANÓTHER DIMENSION VOTING BOOTH") return "ANÓTHER DIMENSION CONTENT CURATOR";
   return value;
 }
 
@@ -742,23 +744,36 @@ function inviteUrl(project) {
   return `${window.location.origin}${window.location.pathname}?project=${encodeURIComponent(project.id)}`;
 }
 
-function inviteHref(project, target = "client") {
-  const targetName = target === "voter3" ? project.voterName : project.clientName;
-  const targetEmail = target === "voter3" ? project.voterEmail : project.clientEmail;
-  const targetPassword = target === "voter3" ? project.voterPassword : project.clientPassword;
+function projectLoginName(project) {
+  return project.clientName || project.title || "";
+}
+
+function curatorEmails(project) {
+  return [
+    ...(Array.isArray(project.curatorEmails) ? project.curatorEmails : []),
+    project.clientEmail,
+    project.voterEmail,
+  ].filter(Boolean).filter((email, index, list) => list.indexOf(email) === index);
+}
+
+function inviteHref(project, targetEmail = "") {
+  const targetPassword = project.clientPassword || project.projectPassword || "";
   const subject = `Uitnodiging voor ${project.title}`;
   const body = [
-    `Je kunt inloggen op de rating page voor ${project.title}:`,
+    `Je kunt inloggen op de curator page voor ${project.title}:`,
     inviteUrl(project),
     "",
-    `Naam: ${targetName || ""}`,
+    `Naam project: ${projectLoginName(project)}`,
     `Wachtwoord: ${targetPassword || ""}`,
   ].join("\n");
   return `mailto:${encodeURIComponent(targetEmail || "")}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
+async function copyProjectLink(project) {
+  await navigator.clipboard.writeText(inviteUrl(project));
+}
+
 function renderProjectList() {
-  newProjectForm.hidden = false;
   if (!currentProjects.length) {
     projectList.innerHTML = '<p class="project-empty">Geen projecten voor deze login.</p>';
     return;
@@ -771,8 +786,8 @@ function renderProjectList() {
       </button>
       ${project.canManage ? `
         <div class="project-actions">
-          <a class="project-invite" href="${escapeHtml(inviteHref(project))}">Nodig klant uit</a>
-          ${project.voterName ? `<a class="project-invite project-invite-voter3" href="${escapeHtml(inviteHref(project, "voter3"))}">Nodig voter 3 uit</a>` : ""}
+          <a class="project-invite" href="${escapeHtml(inviteHref(project, curatorEmails(project).join(",")))}">VERSTUUR UITNODIGING(EN)</a>
+          <button class="project-copy" type="button" data-project-copy="${escapeHtml(project.id)}">COPY PROJECT LINK</button>
           ${project.baseAssets ? "" : `<button class="project-delete" type="button" data-project-delete="${escapeHtml(project.id)}" aria-label="Project verwijderen">☠️</button>`}
         </div>
       ` : ""}
@@ -1076,6 +1091,23 @@ function mergeBoxes(boxes, gap) {
   return merged;
 }
 
+function clampDetectedSheetBox(box, image) {
+  const x = Math.max(0, Math.round(box.x));
+  const y = Math.max(0, Math.round(box.y));
+  const right = Math.min(image.naturalWidth, Math.round(box.x + box.width));
+  const bottom = Math.min(image.naturalHeight, Math.round(box.y + box.height));
+  return {
+    x,
+    y,
+    width: Math.max(1, right - x),
+    height: Math.max(1, bottom - y),
+  };
+}
+
+function sheetDetectionPad(width, height) {
+  return Math.max(6, Math.round(Math.min(width, height) * 0.012));
+}
+
 function projectionRuns(projection, threshold, minRun, maxInnerGap) {
   const raw = [];
   let start = null;
@@ -1138,13 +1170,13 @@ function projectionSheetBoxes(mask, width, height, image, scale) {
         }
       }
       if (area < Math.max(120, width * height * 0.00018)) return;
-      const pad = 18;
-      boxes.push({
-        x: Math.max(0, Math.round((minX - pad) / scale)),
-        y: Math.max(0, Math.round((minY - pad) / scale)),
-        width: Math.min(image.naturalWidth, Math.round((maxX - minX + pad * 2) / scale)),
-        height: Math.min(image.naturalHeight, Math.round((maxY - minY + pad * 2) / scale)),
-      });
+      const pad = sheetDetectionPad(width, height);
+      boxes.push(clampDetectedSheetBox({
+        x: (minX - pad) / scale,
+        y: (minY - pad) / scale,
+        width: (maxX - minX + 1 + pad * 2) / scale,
+        height: (maxY - minY + 1 + pad * 2) / scale,
+      }, image));
     });
   });
   return sortBoxesReadingOrder(boxes.filter((box) => box.width > 32 && box.height > 32)).slice(0, 80);
@@ -1176,13 +1208,13 @@ function gridSheetBoxes(mask, width, height, image, scale) {
         }
       }
       if (area < Math.max(120, width * height * 0.00018)) continue;
-      const pad = 18;
-      boxes.push({
-        x: Math.max(0, Math.round((minX - pad) / scale)),
-        y: Math.max(0, Math.round((minY - pad) / scale)),
-        width: Math.min(image.naturalWidth, Math.round((maxX - minX + pad * 2) / scale)),
-        height: Math.min(image.naturalHeight, Math.round((maxY - minY + pad * 2) / scale)),
-      });
+      const pad = sheetDetectionPad(width, height);
+      boxes.push(clampDetectedSheetBox({
+        x: (minX - pad) / scale,
+        y: (minY - pad) / scale,
+        width: (maxX - minX + 1 + pad * 2) / scale,
+        height: (maxY - minY + 1 + pad * 2) / scale,
+      }, image));
     }
   }
   return sortBoxesReadingOrder(boxes.filter((box) => box.width > 32 && box.height > 32)).slice(0, 80);
@@ -1261,21 +1293,18 @@ function detectSheetBoxes(image) {
       });
     }
     if (area < minArea || maxX - minX < 12 || maxY - minY < 12) continue;
-    const pad = Math.round(14 * scale);
-    components.push({
-      x: Math.max(0, (minX - pad) / scale),
-      y: Math.max(0, (minY - pad) / scale),
-      width: Math.min(image.naturalWidth, (maxX - minX + pad * 2) / scale),
-      height: Math.min(image.naturalHeight, (maxY - minY + pad * 2) / scale),
-    });
+    const pad = sheetDetectionPad(width, height);
+    components.push(clampDetectedSheetBox({
+      x: (minX - pad) / scale,
+      y: (minY - pad) / scale,
+      width: (maxX - minX + 1 + pad * 2) / scale,
+      height: (maxY - minY + 1 + pad * 2) / scale,
+    }, image));
   }
   const gap = Math.max(image.naturalWidth, image.naturalHeight) * 0.006;
-  const merged = mergeBoxes(components, gap).map((box) => ({
-    x: Math.max(0, Math.round(box.x)),
-    y: Math.max(0, Math.round(box.y)),
-    width: Math.min(image.naturalWidth - box.x, Math.round(box.width)),
-    height: Math.min(image.naturalHeight - box.y, Math.round(box.height)),
-  })).filter((box) => box.width > 28 && box.height > 28);
+  const merged = mergeBoxes(components, gap)
+    .map((box) => clampDetectedSheetBox(box, image))
+    .filter((box) => box.width > 28 && box.height > 28);
   if (!merged.length) return [{ x: 0, y: 0, width: image.naturalWidth, height: image.naturalHeight }];
   return sortBoxesReadingOrder(merged).slice(0, 80);
 }
@@ -1317,6 +1346,29 @@ function sheetBoxToCanvasRect(box) {
   };
 }
 
+function boxOverlapArea(a, b) {
+  const width = Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x));
+  const height = Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y));
+  return width * height;
+}
+
+function assignSheetBoxColors(boxes) {
+  const assigned = [];
+  sortBoxesReadingOrder(boxes).forEach((box) => {
+    const preferred = assigned.length % sheetBoxPalette.length;
+    const scores = sheetBoxPalette.map((_, colorIndex) => assigned
+      .filter((item) => item.colorIndex === colorIndex)
+      .reduce((score, item) => score + boxOverlapArea(box, item.box), 0));
+    const best = scores.reduce((winner, score, index) => {
+      if (score < scores[winner]) return index;
+      if (score > scores[winner]) return winner;
+      return Math.abs(index - preferred) < Math.abs(winner - preferred) ? index : winner;
+    }, preferred);
+    assigned.push({ box, colorIndex: best });
+  });
+  return new Map(assigned.map((item) => [item.box, item.colorIndex]));
+}
+
 function drawSheetCutter() {
   sheetContext.clearRect(0, 0, sheetCanvas.width, sheetCanvas.height);
   sheetContext.fillStyle = "#f4f1ea";
@@ -1324,19 +1376,23 @@ function drawSheetCutter() {
   if (!sheetImage) return;
   sheetImageRect = calculateSheetImageRect();
   sheetContext.drawImage(sheetImage, sheetImageRect.x, sheetImageRect.y, sheetImageRect.width, sheetImageRect.height);
+  const colorMap = assignSheetBoxColors(sheetBoxes);
   sheetBoxes.forEach((box, index) => {
     const rect = sheetBoxToCanvasRect(box);
-    sheetContext.strokeStyle = "#ff1d1d";
+    const color = sheetBoxPalette[colorMap.get(box) ?? (index % sheetBoxPalette.length)];
+    sheetContext.strokeStyle = color;
     sheetContext.lineWidth = 3;
     sheetContext.strokeRect(rect.x, rect.y, rect.width, rect.height);
-    sheetContext.fillStyle = "#ff1d1d";
+    sheetContext.fillStyle = color;
     sheetHandlePoints(rect).forEach(({ x, y }) => {
       sheetContext.beginPath();
       sheetContext.arc(x, y, 8, 0, Math.PI * 2);
       sheetContext.fill();
     });
-    sheetContext.fillStyle = "rgba(255, 29, 29, 0.88)";
+    sheetContext.fillStyle = color;
+    sheetContext.globalAlpha = 0.88;
     sheetContext.fillRect(rect.x, rect.y, 26, 20);
+    sheetContext.globalAlpha = 1;
     sheetContext.fillStyle = "#ffffff";
     sheetContext.font = "700 13px system-ui";
     sheetContext.fillText(String(index + 1), rect.x + 8, rect.y + 14);
@@ -2002,6 +2058,19 @@ resetTextEdit.addEventListener("click", () => {
 });
 
 projectList.addEventListener("click", (event) => {
+  const copyButton = event.target.closest("[data-project-copy]");
+  if (copyButton) {
+    const project = currentProjects.find((item) => item.id === copyButton.dataset.projectCopy);
+    if (!project) return;
+    copyProjectLink(project)
+      .then(() => {
+        newProjectError.textContent = "Projectlink gekopieerd.";
+      })
+      .catch(() => {
+        newProjectError.textContent = "Projectlink kopiëren mislukte.";
+      });
+    return;
+  }
   const deleteButton = event.target.closest("[data-project-delete]");
   if (deleteButton) {
     const projectId = deleteButton.dataset.projectDelete;
@@ -2014,6 +2083,13 @@ projectList.addEventListener("click", (event) => {
   const button = event.target.closest("[data-project-id]");
   if (!button) return;
   openProject(button.dataset.projectId);
+});
+
+newProjectToggle.addEventListener("click", () => {
+  const open = newProjectForm.hidden;
+  newProjectForm.hidden = !open;
+  newProjectToggle.setAttribute("aria-expanded", String(open));
+  if (open) newProjectTitle.focus();
 });
 
 async function deleteProject(projectId) {
@@ -2031,14 +2107,16 @@ async function deleteProject(projectId) {
 newProjectForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   newProjectError.textContent = "";
+  lastCreatedProject = null;
+  copyNewProjectLink.disabled = true;
+  const curatorEmailsPayload = [
+    newProjectCuratorEmailA.value.trim(),
+    newProjectCuratorEmailB.value.trim(),
+  ].filter(Boolean);
   const payload = {
     title: newProjectTitle.value.trim(),
-    clientName: newProjectClient.value.trim(),
-    clientEmail: newProjectEmail.value.trim(),
-    clientPassword: newProjectPassword.value,
-    voterName: newProjectVoter.value.trim(),
-    voterEmail: newProjectVoterEmail.value.trim(),
-    voterPassword: newProjectVoterPassword.value,
+    projectPassword: newProjectPassword.value,
+    curatorEmails: curatorEmailsPayload,
   };
   const response = await fetch("/api/projects", {
     method: "POST",
@@ -2051,9 +2129,23 @@ newProjectForm.addEventListener("submit", async (event) => {
   }
   const data = await response.json();
   currentProjects = [...currentProjects, data.project];
+  lastCreatedProject = data.project;
   renderProjectList();
+  if (curatorEmailsPayload.length) window.location.href = inviteHref(data.project, curatorEmailsPayload.join(","));
   newProjectForm.reset();
-  newProjectError.textContent = "Project gemaakt. Rodger staat erbij; de uitnodiging staat in de projectkaart.";
+  copyNewProjectLink.disabled = false;
+  newProjectError.textContent = "Project gemaakt. Rodger staat erbij; de link staat klaar.";
+});
+
+copyNewProjectLink.addEventListener("click", () => {
+  if (!lastCreatedProject) return;
+  copyProjectLink(lastCreatedProject)
+    .then(() => {
+      newProjectError.textContent = "Projectlink gekopieerd.";
+    })
+    .catch(() => {
+      newProjectError.textContent = "Projectlink kopiëren mislukte.";
+    });
 });
 
 async function startApp() {

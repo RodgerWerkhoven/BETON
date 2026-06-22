@@ -1396,7 +1396,41 @@ function drawSheetCutter() {
     sheetContext.fillStyle = "#ffffff";
     sheetContext.font = "700 13px system-ui";
     sheetContext.fillText(String(index + 1), rect.x + 8, rect.y + 14);
+    sheetBoxControlRects(rect).forEach((control) => {
+      sheetContext.fillStyle = "#ffffff";
+      sheetContext.strokeStyle = color;
+      sheetContext.lineWidth = 2;
+      sheetContext.beginPath();
+      sheetContext.roundRect(control.x, control.y, control.width, control.height, 5);
+      sheetContext.fill();
+      sheetContext.stroke();
+      sheetContext.fillStyle = color;
+      sheetContext.font = "900 16px system-ui";
+      sheetContext.textAlign = "center";
+      sheetContext.textBaseline = "middle";
+      sheetContext.fillText(control.action === "add" ? "+" : "-", control.x + control.width / 2, control.y + control.height / 2 - 1);
+      sheetContext.textAlign = "start";
+      sheetContext.textBaseline = "alphabetic";
+    });
   });
+}
+
+function sheetBoxControlRects(rect) {
+  const size = 22;
+  const gap = 5;
+  const y = rect.y + 5;
+  const right = Math.min(rect.x + rect.width - 5, sheetCanvas.width - 5);
+  let minusX = right - size;
+  let addX = minusX - gap - size;
+  const left = Math.max(rect.x + 5, 5);
+  if (addX < left) {
+    addX = left;
+    minusX = Math.min(addX + size + gap, sheetCanvas.width - size - 5);
+  }
+  return [
+    { action: "add", x: addX, y, width: size, height: size },
+    { action: "remove", x: minusX, y, width: size, height: size },
+  ];
 }
 
 function sheetHandlePoints(rect) {
@@ -1419,6 +1453,10 @@ function getSheetPoint(event) {
 function hitTestSheet(point) {
   for (let index = sheetBoxes.length - 1; index >= 0; index -= 1) {
     const rect = sheetBoxToCanvasRect(sheetBoxes[index]);
+    const control = sheetBoxControlRects(rect).find((item) => (
+      point.x >= item.x && point.x <= item.x + item.width && point.y >= item.y && point.y <= item.y + item.height
+    ));
+    if (control) return { index, mode: control.action };
     const handle = sheetHandlePoints(rect).find((item) => Math.hypot(item.x - point.x, item.y - point.y) < 18);
     if (handle) return { index, mode: "resize", handle: handle.name };
     if (point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height) {
@@ -1435,6 +1473,29 @@ function clampSheetBox(box) {
   next.x = Math.max(0, Math.min(sheetImage.naturalWidth - next.width, next.x));
   next.y = Math.max(0, Math.min(sheetImage.naturalHeight - next.height, next.y));
   return next;
+}
+
+function addSheetBoxFrom(index) {
+  if (!sheetImage || !sheetBoxes[index]) return;
+  const source = sheetBoxes[index];
+  const offset = Math.max(18, Math.round(Math.min(source.width, source.height) * 0.12));
+  const rightSpace = sheetImage.naturalWidth - (source.x + source.width);
+  const bottomSpace = sheetImage.naturalHeight - (source.y + source.height);
+  const next = {
+    ...source,
+    x: source.x + (rightSpace >= offset ? offset : 0),
+    y: source.y + (rightSpace >= offset ? 0 : Math.min(offset, Math.max(0, bottomSpace))),
+  };
+  sheetBoxes.splice(index + 1, 0, clampSheetBox(next));
+  sheetStatus.textContent = `${sheetBoxes.length} vakken.`;
+  drawSheetCutter();
+}
+
+function removeSheetBox(index) {
+  sheetBoxes.splice(index, 1);
+  sheetPointer = null;
+  sheetStatus.textContent = `${sheetBoxes.length} vakken.`;
+  drawSheetCutter();
 }
 
 function updateSheetBoxFromPointer(event) {
@@ -1954,6 +2015,14 @@ sheetCanvas.addEventListener("pointerdown", (event) => {
   const startPoint = getSheetPoint(event);
   const hit = hitTestSheet(startPoint);
   if (!hit) return;
+  if (hit.mode === "add") {
+    addSheetBoxFrom(hit.index);
+    return;
+  }
+  if (hit.mode === "remove") {
+    removeSheetBox(hit.index);
+    return;
+  }
   sheetCanvas.setPointerCapture(event.pointerId);
   sheetPointer = { ...hit, startPoint, startBox: { ...sheetBoxes[hit.index] } };
 });

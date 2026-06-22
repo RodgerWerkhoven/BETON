@@ -4,21 +4,19 @@ const { get, put } = require("@vercel/blob");
 const CLIENTS = {
   Alien: { password: "Beton", label: "Alien", role: "client" },
   Rodger: { password: "Beton", label: "Rodger", role: "admin" },
-  Voter3: { password: "Beton", label: "Voter 3", role: "voter3" },
 };
 
 const DEFAULT_DIRECTORY = {
   users: {
     Rodger: { password: "Beton", label: "Rodger", role: "admin" },
     Alien: { password: "Beton", label: "Alien", role: "client" },
-    Voter3: { password: "Beton", label: "Voter 3", role: "voter3" },
   },
   projects: {
     Alien: {
       id: "Alien",
       title: "BETON",
       owner: "Rodger",
-      members: ["Alien", "Rodger", "Voter3"],
+      members: ["Alien", "Rodger"],
       baseAssets: true,
       createdAt: "2026-06-20T00:00:00.000Z",
     },
@@ -84,7 +82,7 @@ function normalizeDirectory(directory) {
     let normalized = ensureRodgerMembership(project);
     if (id === "Alien") {
       const members = new Set(normalized.members || []);
-      members.add("Voter3");
+      members.delete("Voter3");
       normalized = { ...normalized, members: [...members], baseAssets: true };
     }
     directory.projects[id] = normalized;

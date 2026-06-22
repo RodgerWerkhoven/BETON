@@ -18,9 +18,9 @@ const newProjectVoter = document.querySelector("#newProjectVoter");
 const newProjectVoterEmail = document.querySelector("#newProjectVoterEmail");
 const newProjectVoterPassword = document.querySelector("#newProjectVoterPassword");
 const newProjectError = document.querySelector("#newProjectError");
-const sheetProjectSelect = document.querySelector("#sheetProjectSelect");
-const sheetFileInput = document.querySelector("#sheetFileInput");
-const sheetPickButton = document.querySelector("#sheetPickButton");
+const voteButtons = document.querySelector("#voteButtons");
+const sheetDialog = document.querySelector("#sheetDialog");
+const sheetTitle = document.querySelector("#sheetTitle");
 const sheetStage = document.querySelector("#sheetStage");
 const sheetCanvas = document.querySelector("#sheetCanvas");
 const sheetContext = sheetCanvas.getContext("2d");
@@ -32,9 +32,6 @@ const count = document.querySelector("#count");
 const controls = document.querySelector(".controls");
 const addedFilter = document.querySelector("#addedFilter");
 const deletedFilter = document.querySelector("#deletedFilter");
-const clientVoteFilter = document.querySelector("#clientVoteFilter");
-const adminVoteFilter = document.querySelector("#adminVoteFilter");
-const voter3VoteFilter = document.querySelector("#voter3VoteFilter");
 const cropDialog = document.querySelector("#cropDialog");
 const cropCanvas = document.querySelector("#cropCanvas");
 const cropContext = cropCanvas.getContext("2d");
@@ -67,11 +64,12 @@ const reviewStoreKey = "beton-logo-review-state-v1";
 const addedItemsStoreKey = "beton-logo-added-items-v1";
 const textStoreKey = "beton-logo-page-text-v1";
 const ratingOptions = ["🤩", "🙂", "🆗", "🤔", "🤮"];
-const voterRoles = [
-  { role: "client", color: "#60d46f", filter: "vote-client" },
-  { role: "admin", color: "#ff30d6", filter: "vote-admin" },
-  { role: "voter3", color: "#9adfff", filter: "vote-voter3" },
+const voterPalette = [
+  { id: "green", color: "#60d46f" },
+  { id: "blue", color: "#9adfff" },
+  { id: "yellow", color: "#ffd85a" },
 ];
+const rodgerVoterColor = { id: "pink", color: "#ff30d6" };
 const defaults = Object.fromEntries(editableTextNodes.map((node) => [node.dataset.editKey, node.textContent]));
 let activeProjectId = new URLSearchParams(window.location.search).get("project") || "Alien";
 
@@ -89,14 +87,18 @@ let crop = { x: 0, y: 0, width: 1, height: 1 };
 let pointer = null;
 let pendingPatch = {};
 let persistTimer = null;
+let persistQueue = Promise.resolve();
+let stateVersion = 0;
 let currentSession = null;
 let currentProjects = [];
 let activeProject = null;
+let voterColorState = {};
 let sheetImage = null;
 let sheetImageName = "";
 let sheetBoxes = [];
 let sheetImageRect = { x: 0, y: 0, width: 1, height: 1, scale: 1 };
 let sheetPointer = null;
+let activeSheetLogo = null;
 
 function showLogin(message = "") {
   loginView.hidden = false;
@@ -156,11 +158,12 @@ function localSnapshot() {
     review: reviewState,
     addedItems,
     text: readJson(textStoreKey, currentTextValues()),
+    voters: voterColorState,
   };
 }
 
 function hasState(state) {
-  return ["crops", "cropHistory", "review", "addedItems", "text"].some((key) => (
+  return ["crops", "cropHistory", "review", "addedItems", "text", "voters"].some((key) => (
     Object.keys(state[key] || {}).length
   ));
 }
@@ -170,6 +173,7 @@ function applyState(state) {
   cropHistory = state.cropHistory || {};
   reviewState = state.review || {};
   addedItems = state.addedItems || {};
+  voterColorState = state.voters || {};
   writeJson(cropStoreKey, cropOverrides);
   writeJson(cropHistoryStoreKey, cropHistory);
   writeJson(reviewStoreKey, reviewState);
@@ -189,7 +193,7 @@ async function persistNow(patch) {
       body: JSON.stringify(toSend),
     });
     if (!response.ok) throw new Error(await response.text());
-    applyState(await response.json());
+    await response.json();
   } catch (error) {
     if (String(error.message || "").includes("401")) showLogin("Log opnieuw in.");
     mergePatch(pendingPatch, toSend);
@@ -203,11 +207,19 @@ function schedulePersist(patch) {
   persistTimer = setTimeout(() => persistNow({}), 450);
 }
 
+function queuePersist(patch) {
+  persistQueue = persistQueue.catch(() => {}).then(() => persistNow(patch));
+  return persistQueue;
+}
+
 async function loadSharedState() {
+  const version = stateVersion + 1;
+  stateVersion = version;
   try {
     const response = await fetch(`/api/state?project=${encodeURIComponent(activeProjectId)}`, { cache: "no-store" });
     if (!response.ok) throw new Error(await response.text());
     const remote = await response.json();
+    if (version !== stateVersion) return;
     const local = localSnapshot();
     if (hasState(remote)) {
       applyState(remote);
@@ -223,6 +235,21 @@ async function loadSharedState() {
       return;
     }
     console.error("State load failed, local backup active", error);
+  }
+}
+
+async function refreshReviewItem(file) {
+  try {
+    const response = await fetch(`/api/state?project=${encodeURIComponent(activeProjectId)}`, { cache: "no-store" });
+    if (!response.ok) throw new Error(await response.text());
+    const remote = await response.json();
+    if (remote.review?.[file]) {
+      reviewState[file] = remote.review[file];
+      writeJson(reviewStoreKey, reviewState);
+    }
+    if (remote.voters) voterColorState = remote.voters;
+  } catch (error) {
+    console.error("Review refresh failed", error);
   }
 }
 
@@ -247,6 +274,7 @@ function imageCopy(value) {
 function imageSource(logo) {
   const key = logoStateKey(logo);
   if (logo.dataUrl) return cropOverrides[key] || logo.dataUrl;
+  if (logo.blobPathname || logo.url) return cropOverrides[key] || mediaSource(logo);
   return cropOverrides[key] || logoPath(logo.file);
 }
 
@@ -330,9 +358,7 @@ function visibleLogos() {
   if (activeFilter === "deleted") return list.filter((logo) => reviewState[logoStateKey(logo)]?.deleted);
   const active = list.filter((logo) => !reviewState[logoStateKey(logo)]?.deleted);
   if (activeFilter === "TOEGEVOEGD") return active.filter((logo) => logo.group === "TOEGEVOEGD" || logo.group === "ADDED");
-  if (activeFilter === "vote-client") return active.filter((logo) => hasVote(logo, "client"));
-  if (activeFilter === "vote-admin") return active.filter((logo) => hasVote(logo, "admin"));
-  if (activeFilter === "vote-voter3") return active.filter((logo) => hasVote(logo, "voter3"));
+  if (activeFilter.startsWith("vote-color-")) return active.filter((logo) => hasVoteColor(logo, activeFilter.replace("vote-color-", "")));
   if (activeFilter === "all") return active;
   return active.filter((logo) => tagsFor(logo, logoReview(logo)).includes(activeFilter));
 }
@@ -341,25 +367,82 @@ function logoReview(logo) {
   return reviewState[logoStateKey(logo)] || {};
 }
 
-function currentRatingRole() {
-  if (currentSession?.role === "admin") return "admin";
-  if (currentSession?.role === "voter3") return "voter3";
-  return "client";
+function currentVoterKey() {
+  return currentSession?.client || "unknown";
 }
 
-function ratingsFor(review) {
-  return review.ratings || (review.rating ? { client: review.rating } : {});
+function legacyClientVoterKey() {
+  return activeProject?.clientName || "Alien";
 }
 
-function rolesForRating(ratings, rating) {
-  return voterRoles.filter((item) => ratings[item.role] === rating);
+function votesFor(review) {
+  const votes = {};
+  if (review.rating) votes[legacyClientVoterKey()] = review.rating;
+  if (review.ratings?.client) votes[legacyClientVoterKey()] = review.ratings.client;
+  if (review.ratings?.admin) votes.Rodger = review.ratings.admin;
+  if (review.ratings?.voter3) votes.__legacyBlue = review.ratings.voter3;
+  return { ...votes, ...(review.votes || {}) };
 }
 
-function voteBackground(roles) {
-  if (!roles.length) return "";
-  if (roles.length === 1) return roles[0].color;
-  const stop = 100 / roles.length;
-  const segments = roles.flatMap((item, index) => {
+function hasLegacyClientVotes() {
+  return Object.values(reviewState).some((review) => review.rating || review.ratings?.client);
+}
+
+function hasLegacyBlueVotes() {
+  return Object.values(reviewState).some((review) => review.ratings?.voter3);
+}
+
+function fallbackColorForVoter(voterKey) {
+  if (voterKey === "Rodger") return rodgerVoterColor;
+  if (voterColorState[voterKey]) return voterColorState[voterKey];
+  if (voterKey === "__legacyBlue") return voterPalette[1];
+  if (voterKey === "Alien" || voterKey === "client") return voterPalette[0];
+  if (voterKey === legacyClientVoterKey() && hasLegacyClientVotes()) return voterPalette[0];
+  return null;
+}
+
+function colorForVoter(voterKey) {
+  return fallbackColorForVoter(voterKey) || voterPalette[0];
+}
+
+function usedVoterColorIds() {
+  const used = new Set(Object.values(voterColorState).map((item) => item.id));
+  if (hasLegacyClientVotes()) used.add(voterPalette[0].id);
+  if (hasLegacyBlueVotes()) used.add(voterPalette[1].id);
+  return used;
+}
+
+function colorForCurrentVoter() {
+  const key = currentVoterKey();
+  const existing = fallbackColorForVoter(key);
+  if (existing || currentSession?.role === "admin") return existing || rodgerVoterColor;
+  const used = usedVoterColorIds();
+  const available = voterPalette.filter((item) => !used.has(item.id));
+  return available[Math.floor(Math.random() * available.length)] || voterPalette[Math.floor(Math.random() * voterPalette.length)];
+}
+
+function ensureCurrentVoterRegistered(options = {}) {
+  const { persist = true } = options;
+  if (!currentSession || !activeProjectId) return { key: "", color: null, changed: false };
+  const key = currentVoterKey();
+  const color = colorForCurrentVoter();
+  if (voterColorState[key]?.id === color.id) return { key, color, changed: false };
+  voterColorState = { ...voterColorState, [key]: color };
+  if (persist) schedulePersist({ voters: { [key]: color } });
+  return { key, color, changed: true };
+}
+
+function votersForRating(votes, rating) {
+  return Object.entries(votes)
+    .filter(([, value]) => value === rating)
+    .map(([voterKey]) => ({ voterKey, ...colorForVoter(voterKey) }));
+}
+
+function voteBackground(voters) {
+  if (!voters.length) return "";
+  if (voters.length === 1) return voters[0].color;
+  const stop = 100 / voters.length;
+  const segments = voters.flatMap((item, index) => {
     const start = (stop * index).toFixed(4);
     const end = (stop * (index + 1)).toFixed(4);
     return [`${item.color} ${start}%`, `${item.color} ${end}%`];
@@ -367,13 +450,33 @@ function voteBackground(roles) {
   return `linear-gradient(90deg, ${segments.join(", ")})`;
 }
 
-function ratingButtonStyle(roles) {
-  const background = voteBackground(roles);
+function ratingButtonStyle(voters) {
+  const background = voteBackground(voters);
   return background ? ` style="background: ${background}"` : "";
 }
 
-function hasVote(logo, role) {
-  return Boolean(ratingsFor(logoReview(logo))[role]);
+function colorFilterValue(colorId) {
+  return `vote-color-${colorId}`;
+}
+
+function hasVoteColor(logo, colorId) {
+  const votes = votesFor(logoReview(logo));
+  return Object.keys(votes).some((voterKey) => colorForVoter(voterKey).id === colorId);
+}
+
+function allActiveVoteColors() {
+  const colors = new Map();
+  Object.values(voterColorState).forEach((color) => colors.set(color.id, color));
+  allLogos().forEach((logo) => {
+    Object.keys(votesFor(logoReview(logo))).forEach((voterKey) => {
+      const color = colorForVoter(voterKey);
+      colors.set(color.id, color);
+    });
+  });
+  return [...colors.values()].sort((a, b) => {
+    const order = { green: 1, pink: 2, blue: 3, yellow: 4 };
+    return (order[a.id] || 9) - (order[b.id] || 9);
+  });
 }
 
 function normalizeTag(tag) {
@@ -408,7 +511,7 @@ function tagsFor(logo, review) {
 }
 
 function isTagFiltered() {
-  return !["all", "TOEGEVOEGD", "deleted", ...voterRoles.map((item) => item.filter)].includes(activeFilter);
+  return !["all", "TOEGEVOEGD", "deleted"].includes(activeFilter) && !activeFilter.startsWith("vote-color-");
 }
 
 function renderTags(logo, review) {
@@ -440,9 +543,16 @@ function renderFilters() {
   controls.innerHTML = `<button class="filter ${activeFilter === "all" ? "active" : ""}" data-filter="all">TAGS</button>${tagButtons.join("")}`;
   addedFilter.classList.toggle("active", activeFilter === "TOEGEVOEGD");
   deletedFilter.classList.toggle("active", activeFilter === "deleted");
-  clientVoteFilter.classList.toggle("active", activeFilter === "vote-client");
-  adminVoteFilter.classList.toggle("active", activeFilter === "vote-admin");
-  voter3VoteFilter.classList.toggle("active", activeFilter === "vote-voter3");
+  const activeColors = allActiveVoteColors();
+  voteButtons.innerHTML = activeColors.map((color) => `
+    <button
+      class="vote-filter ${activeFilter === colorFilterValue(color.id) ? "active" : ""}"
+      type="button"
+      data-filter="${colorFilterValue(color.id)}"
+      aria-label="Stemmen in deze kleur tonen"
+      style="background: ${color.color}"
+    ></button>
+  `).join("");
 }
 
 function currentCommentPrefix() {
@@ -539,18 +649,20 @@ function render() {
             <div class="source">${logo.added ? `Toegevoegd: ${safeSource}` : `Bron ${logo.sourceIndex}.${logo.dotIndex}: ${safeSource}`}</div>
             <div class="rating" role="group" aria-label="Rating voor image ${logo.id}">
               ${ratingOptions.map((rating) => {
-                const ratings = ratingsFor(review);
-                const voteRoles = rolesForRating(ratings, rating);
+                const votes = votesFor(review);
+                const voteVoters = votersForRating(votes, rating);
+                const currentVoted = votes[currentVoterKey()] === rating;
                 return `
                 <button
-                  class="rating-button ${voteRoles.map((item) => `${item.role}-rated`).join(" ")}"
+                  class="rating-button"
                   type="button"
                   data-action="rating"
                   data-id="${logo.id}"
                   data-rating="${rating}"
-                  data-vote-count="${voteRoles.length}"
+                  data-vote-count="${voteVoters.length}"
+                  data-current-voted="${currentVoted ? "true" : "false"}"
                   aria-label="Rating ${rating}"
-                  ${ratingButtonStyle(voteRoles)}
+                  ${ratingButtonStyle(voteVoters)}
                 >${rating}</button>
               `;
               }).join("")}
@@ -562,7 +674,8 @@ function render() {
               </label>
             </div>
             <div class="card-actions">
-              ${croppable ? `<button class="edit-logo" type="button" data-id="${logo.id}">Bijsnijden</button>` : ""}
+              ${croppable ? `<button class="edit-logo" type="button" data-id="${logo.id}" aria-label="Bijsnijden">✂️</button>` : ""}
+              ${croppable && logo.added ? `<button class="sheet-logo" type="button" data-action="sheet-cut" data-id="${logo.id}" aria-label="Sheet cut-up">🪚</button>` : ""}
               <button class="undo-card" type="button" data-action="undo" data-id="${logo.id}" ${cropHistory[logoStateKey(logo)]?.length ? "" : "disabled"}>↩️</button>
               <button class="delete-logo ${review.deleted ? "is-restore" : ""}" type="button" data-action="delete" data-id="${logo.id}">${review.deleted ? "Herstel" : "☠️"}</button>
             </div>
@@ -644,18 +757,8 @@ function inviteHref(project, target = "client") {
   return `mailto:${encodeURIComponent(targetEmail || "")}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
-function renderSheetProjectOptions() {
-  sheetProjectSelect.innerHTML = currentProjects.map((project) => (
-    `<option value="${escapeHtml(project.id)}">${escapeHtml(project.title)}</option>`
-  )).join("");
-  sheetProjectSelect.disabled = !currentProjects.length;
-  sheetPickButton.disabled = !currentProjects.length;
-  sheetCutButton.disabled = !currentProjects.length;
-}
-
 function renderProjectList() {
   newProjectForm.hidden = false;
-  renderSheetProjectOptions();
   if (!currentProjects.length) {
     projectList.innerHTML = '<p class="project-empty">Geen projecten voor deze login.</p>';
     return;
@@ -842,6 +945,7 @@ function blobPathnameFromUrl(url) {
 }
 
 async function fileToStoredSource(file, id) {
+  if (file.type.startsWith("image/") && file.size > 350000) return uploadMediaFile(file, id);
   if (file.type.startsWith("image/")) return { dataUrl: await fileToStoredDataUrl(file) };
   if (file.type.startsWith("video/") || file.type.startsWith("audio/") || /\.(mov|mp4|m4v|mp3|aac|m4a)$/i.test(file.name)) {
     return uploadMediaFile(file, id);
@@ -884,20 +988,27 @@ async function addFiles(files) {
   }
   saveAddedItems();
   saveReview();
-  schedulePersist({ addedItems: addedPatch, review: reviewPatch });
+  queuePersist({ addedItems: addedPatch, review: reviewPatch });
   render();
 }
 
-function resetSheetCutter() {
+function resetSheetCutter(closeDialog = false) {
   sheetImage = null;
   sheetImageName = "";
   sheetBoxes = [];
   sheetPointer = null;
-  sheetStage.hidden = true;
-  sheetResetButton.hidden = true;
-  sheetCutButton.hidden = true;
+  activeSheetLogo = null;
   sheetStatus.textContent = "";
   sheetContext.clearRect(0, 0, sheetCanvas.width, sheetCanvas.height);
+  if (closeDialog && sheetDialog.open) sheetDialog.close();
+}
+
+function resetSheetBoxes() {
+  if (!sheetImage) return;
+  sheetPointer = null;
+  sheetBoxes = detectSheetBoxes(sheetImage);
+  drawSheetCutter();
+  sheetStatus.textContent = `${sheetBoxes.length} vakken gevonden.`;
 }
 
 function averageCornerColor(data, width, height) {
@@ -1295,16 +1406,16 @@ function updateSheetBoxFromPointer(event) {
   drawSheetCutter();
 }
 
-async function loadSheetFile(file) {
+async function openSheetCutter(logo) {
   sheetStatus.textContent = "";
-  const dataUrl = await readFileAsDataUrl(file);
-  const image = await loadImageFromUrl(dataUrl);
+  sheetCutButton.disabled = false;
+  activeSheetLogo = logo;
+  sheetTitle.textContent = logo.name || `Image ${logo.id}`;
+  const image = await loadImageFromUrl(imageSource(logo));
   sheetImage = image;
-  sheetImageName = file.name || "sheet";
+  sheetImageName = logo.name || logo.source || `sheet-${logo.id}`;
   sheetBoxes = detectSheetBoxes(image);
-  sheetStage.hidden = false;
-  sheetResetButton.hidden = false;
-  sheetCutButton.hidden = false;
+  if (!sheetDialog.open) sheetDialog.showModal();
   setTimeout(() => {
     resizeSheetCanvas();
     drawSheetCutter();
@@ -1326,13 +1437,9 @@ function makeSheetCutDataUrl(box) {
 
 async function cutSheetIntoProject() {
   if (!sheetImage || !sheetBoxes.length) return;
-  const projectId = sheetProjectSelect.value;
-  const project = currentProjects.find((item) => item.id === projectId);
-  if (!project) {
-    sheetStatus.textContent = "Kies een project.";
-    return;
-  }
+  const projectId = activeProjectId;
   sheetCutButton.disabled = true;
+  await persistQueue.catch(() => {});
   const stamp = Date.now();
   const addedPatch = {};
   sortBoxesReadingOrder(sheetBoxes)
@@ -1361,9 +1468,10 @@ async function cutSheetIntoProject() {
     sheetStatus.textContent = "Sheet snijden mislukte.";
     return;
   }
-  resetSheetCutter();
-  activeProject = project;
-  await openProject(projectId);
+  applyState(await response.json());
+  resetSheetCutter(true);
+  activeFilter = "all";
+  render();
 }
 
 function openCropper(logo) {
@@ -1605,13 +1713,19 @@ controls.addEventListener("click", (event) => {
   setActiveFilter(button.dataset.filter);
 });
 
-[addedFilter, deletedFilter, clientVoteFilter, adminVoteFilter, voter3VoteFilter].forEach((button) => {
+[addedFilter, deletedFilter].forEach((button) => {
   button.addEventListener("click", () => {
     setActiveFilter(activeFilter === button.dataset.filter ? "all" : button.dataset.filter);
   });
 });
 
-gallery.addEventListener("click", (event) => {
+voteButtons.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-filter]");
+  if (!button) return;
+  setActiveFilter(activeFilter === button.dataset.filter ? "all" : button.dataset.filter);
+});
+
+gallery.addEventListener("click", async (event) => {
   if (event.target.closest("#addFileButton")) {
     addFileInput.click();
     return;
@@ -1635,13 +1749,22 @@ gallery.addEventListener("click", (event) => {
     const review = logoReview(logo);
     const key = logoStateKey(logo);
     if (action.dataset.action === "rating") {
-      const role = currentRatingRole();
-      review.ratings = ratingsFor(review);
-      if (review.ratings[role] === action.dataset.rating) delete review.ratings[role];
-      else review.ratings[role] = action.dataset.rating;
-      delete review.rating;
-      reviewState[key] = review;
-      saveReviewItem(key);
+      const voterKey = currentVoterKey();
+      const hadCurrentVote = action.dataset.currentVoted === "true" || votesFor(review)[voterKey] === action.dataset.rating;
+      await refreshReviewItem(key);
+      const voterRegistration = ensureCurrentVoterRegistered({ persist: false });
+      const refreshedReview = logoReview(logo);
+      const remoteHadCurrentVote = votesFor(refreshedReview)[voterKey] === action.dataset.rating;
+      refreshedReview.votes = votesFor(refreshedReview);
+      if (hadCurrentVote || remoteHadCurrentVote) delete refreshedReview.votes[voterKey];
+      else refreshedReview.votes[voterKey] = action.dataset.rating;
+      delete refreshedReview.ratings;
+      delete refreshedReview.rating;
+      reviewState[key] = refreshedReview;
+      writeJson(reviewStoreKey, reviewState);
+      const patch = { review: { [key]: reviewState[key] || null } };
+      if (voterRegistration.changed && voterRegistration.color) patch.voters = { [voterKey]: voterRegistration.color };
+      await queuePersist(patch);
       render();
     }
     if (action.dataset.action === "delete") {
@@ -1686,6 +1809,9 @@ gallery.addEventListener("click", (event) => {
     }
     if (action.dataset.action === "open-media") {
       openLightbox(logo);
+    }
+    if (action.dataset.action === "sheet-cut") {
+      openSheetCutter(logo);
     }
     return;
   }
@@ -1764,12 +1890,7 @@ addFileInput.addEventListener("change", async () => {
   addFileInput.value = "";
 });
 
-sheetPickButton.addEventListener("click", () => sheetFileInput.click());
-sheetFileInput.addEventListener("change", async () => {
-  if (sheetFileInput.files?.[0]) await loadSheetFile(sheetFileInput.files[0]);
-  sheetFileInput.value = "";
-});
-sheetResetButton.addEventListener("click", resetSheetCutter);
+sheetResetButton.addEventListener("click", resetSheetBoxes);
 sheetCutButton.addEventListener("click", cutSheetIntoProject);
 
 sheetCanvas.addEventListener("pointerdown", (event) => {
@@ -1857,9 +1978,13 @@ window.addEventListener("resize", () => {
 });
 
 window.addEventListener("resize", () => {
-  if (!sheetImage || sheetStage.hidden) return;
+  if (!sheetImage || !sheetDialog.open) return;
   resizeSheetCanvas();
   drawSheetCutter();
+});
+
+sheetDialog.addEventListener("close", () => {
+  if (!sheetCutButton.disabled) resetSheetCutter(false);
 });
 
 toggleTextEdit.addEventListener("click", () => setTextEditMode(true));

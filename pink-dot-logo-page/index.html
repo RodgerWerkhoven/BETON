@@ -68,23 +68,6 @@
             <button type="submit">Maak project</button>
             <p id="newProjectError" class="login-error" role="alert"></p>
           </form>
-          <section id="sheetCutter" class="sheet-cutter">
-            <p class="eyebrow">Sheet Cutter</p>
-            <label>
-              <span>Project</span>
-              <select id="sheetProjectSelect"></select>
-            </label>
-            <input id="sheetFileInput" type="file" accept="image/*" hidden />
-            <button id="sheetPickButton" type="button">Sheet uploaden</button>
-            <div id="sheetStage" class="sheet-stage" hidden>
-              <canvas id="sheetCanvas" width="900" height="560"></canvas>
-            </div>
-            <div class="sheet-actions">
-              <button id="sheetResetButton" type="button" hidden>Reset</button>
-              <button id="sheetCutButton" class="sheet-cut" type="button" hidden>✅</button>
-            </div>
-            <p id="sheetStatus" class="login-error" role="alert"></p>
-          </section>
         </aside>
       </main>
     </section>
@@ -103,11 +86,7 @@
         </div>
       </div>
       <section class="vote-filters" aria-label="Votes filter">
-        <div class="vote-buttons">
-          <button class="vote-filter vote-filter-client" id="clientVoteFilter" type="button" data-filter="vote-client" aria-label="Groene stemmen tonen"></button>
-          <button class="vote-filter vote-filter-admin" id="adminVoteFilter" type="button" data-filter="vote-admin" aria-label="Pink stemmen tonen"></button>
-          <button class="vote-filter vote-filter-voter3" id="voter3VoteFilter" type="button" data-filter="vote-voter3" aria-label="Lichtblauwe stemmen tonen"></button>
-        </div>
+        <div class="vote-buttons" id="voteButtons"></div>
         <div class="vote-label">VOTES</div>
       </section>
       <div class="top-actions">
@@ -160,6 +139,26 @@
         <button id="saveCrop" type="button">Opslaan in grid</button>
       </div>
       <p id="cropMeta" class="crop-meta"></p>
+    </dialog>
+
+    <dialog id="sheetDialog" class="crop-dialog sheet-dialog">
+      <form method="dialog">
+        <button class="close" aria-label="Sluiten">×</button>
+      </form>
+      <div class="crop-head">
+        <div>
+          <p class="eyebrow">Sheet Cutter</p>
+          <h2 id="sheetTitle">Cut-up</h2>
+        </div>
+      </div>
+      <div id="sheetStage" class="sheet-stage">
+        <canvas id="sheetCanvas" width="1000" height="680"></canvas>
+      </div>
+      <div class="crop-footer sheet-actions">
+        <button id="sheetResetButton" type="button">Reset</button>
+        <button id="sheetCutButton" class="sheet-cut" type="button">✅</button>
+      </div>
+      <p id="sheetStatus" class="crop-meta" role="alert"></p>
     </dialog>
     </div>
 

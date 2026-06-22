@@ -7,6 +7,7 @@ const EMPTY_STATE = {
   review: {},
   addedItems: {},
   text: {},
+  voters: {},
 };
 
 async function readBody(req) {
@@ -88,6 +89,7 @@ module.exports = async function handler(req, res) {
       mergeMap(state.review, patch.review);
       mergeMap(state.addedItems, patch.addedItems);
       mergeMap(state.text, patch.text);
+      mergeMap(state.voters, patch.voters);
       await saveState(projectId, state);
       return res.status(200).json(state);
     }

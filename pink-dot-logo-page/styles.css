@@ -647,6 +647,77 @@ main {
   color: #ffffff;
 }
 
+.upload-progress-frame {
+  align-content: center;
+  justify-items: center;
+  grid-template-rows: auto auto auto auto;
+  gap: 12px;
+  background:
+    linear-gradient(rgba(255, 250, 241, 0.88), rgba(255, 250, 241, 0.88)),
+    repeating-linear-gradient(
+      -45deg,
+      #fffaf1,
+      #fffaf1 10px,
+      #f1eadb 10px,
+      #f1eadb 20px
+    );
+  color: var(--ink);
+  padding: 18px;
+}
+
+.upload-logo-loader {
+  width: min(82%, 210px);
+  height: 74px;
+  background: url("/assets/another-dimension-logo.png") center / contain no-repeat;
+  filter: drop-shadow(0 0 0 var(--dark));
+  animation: uploadLogoBreathe 1.15s ease-in-out infinite;
+}
+
+.upload-progress-frame strong {
+  max-width: 100%;
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.upload-progress-frame small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.upload-progress-track {
+  width: min(190px, 86%);
+  height: 10px;
+  overflow: hidden;
+  border: 1px solid var(--dark);
+  border-radius: 999px;
+  background: #ffffff;
+}
+
+.upload-progress-track span {
+  display: block;
+  height: 100%;
+  min-width: 12px;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 160ms ease;
+}
+
+@keyframes uploadLogoBreathe {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
 .upload-error-frame span {
   justify-self: center;
   border: 1px solid #ffffff;

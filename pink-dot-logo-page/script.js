@@ -315,6 +315,19 @@ function mediaSource(logo) {
 }
 
 function renderMediaStage(logo, safeName) {
+  if (logo.uploading) {
+    const progress = Math.max(0, Math.min(99, Math.round(logo.uploadProgress || 0)));
+    return `
+      <div class="media-frame upload-progress-frame">
+        <div class="upload-logo-loader" aria-hidden="true"></div>
+        <strong>${safeName}</strong>
+        <div class="upload-progress-track" aria-label="Upload ${progress}%">
+          <span style="width: ${progress}%"></span>
+        </div>
+        <small>${progress ? `${progress}%` : "Upload starten"}</small>
+      </div>
+    `;
+  }
   if (logo.uploadError) {
     return `
       <div class="media-frame upload-error-frame">
@@ -500,6 +513,7 @@ function uniqueTags(tags) {
 function inferredTags(logo) {
   const text = `${logo.group || ""} ${logo.source || ""} ${logo.name || ""} ${logo.file || ""}`;
   const tags = [logo.group || "TOEGEVOEGD"];
+  if (logo.duplicateUpload) tags.push("AL UPLOADED!");
   if (isAudioLogo(logo)) tags.push("AUDIO");
   else if (isVideoLogo(logo)) tags.push("VIDEO");
   else if (/\b3d\b/i.test(text)) tags.push("3D");
@@ -587,7 +601,8 @@ function saveReviewItem(file) {
 }
 
 function saveAddedItems() {
-  writeJson(addedItemsStoreKey, addedItems);
+  const durableItems = Object.fromEntries(Object.entries(addedItems).filter(([, item]) => !item.uploading));
+  writeJson(addedItemsStoreKey, durableItems);
 }
 
 function saveCropState(file) {
@@ -634,7 +649,7 @@ function render() {
         const review = logoReview(logo);
         const safeSource = escapeHtml(imageCopy(logo.source));
         const safeName = escapeHtml(logo.name || `Image ${logo.id}`);
-        const croppable = isImageLogo(logo);
+        const croppable = isImageLogo(logo) && !logo.uploading && !logo.uploadError;
         return `
         <article class="logo-card ${review.deleted ? "is-deleted" : ""}">
           ${croppable
@@ -920,19 +935,41 @@ function safeUploadName(file) {
     .slice(0, 90) || "upload";
 }
 
-async function uploadMediaFile(file, id) {
+function putFileWithProgress(url, file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("PUT", url);
+    request.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+    request.upload.onprogress = (event) => {
+      if (!event.lengthComputable || !onProgress) return;
+      onProgress(Math.round((event.loaded / event.total) * 92) + 6);
+    };
+    request.onload = () => {
+      if (request.status >= 200 && request.status < 300) {
+        try {
+          resolve(JSON.parse(request.responseText || "{}"));
+        } catch (error) {
+          reject(error);
+        }
+      } else {
+        reject(new Error(request.responseText || `Upload failed with ${request.status}`));
+      }
+    };
+    request.onerror = () => reject(new Error("Upload verbinding mislukt"));
+    request.send(file);
+  });
+}
+
+async function uploadMediaFile(file, id, onProgress) {
+  onProgress?.(2);
   const ticketResponse = await fetch(`/api/upload-url?project=${encodeURIComponent(activeProjectId)}&name=${encodeURIComponent(`${id}-${safeUploadName(file)}`)}&type=${encodeURIComponent(file.type || "application/octet-stream")}`, {
     method: "POST",
   });
   if (!ticketResponse.ok) throw new Error(await ticketResponse.text());
   const ticket = await ticketResponse.json();
-  const uploadResponse = await fetch(ticket.presignedUrl, {
-    method: "PUT",
-    headers: { "Content-Type": file.type || "application/octet-stream" },
-    body: file,
-  });
-  if (!uploadResponse.ok) throw new Error(await uploadResponse.text());
-  const result = await uploadResponse.json();
+  onProgress?.(6);
+  const result = await putFileWithProgress(ticket.presignedUrl, file, onProgress);
+  onProgress?.(99);
   return {
     url: result.url,
     blobPathname: result.pathname || blobPathnameFromUrl(result.url) || ticket.pathname,
@@ -947,29 +984,56 @@ function blobPathnameFromUrl(url) {
   }
 }
 
-async function fileToStoredSource(file, id) {
-  if (file.type.startsWith("image/") && file.size > 350000) return uploadMediaFile(file, id);
-  if (file.type.startsWith("image/")) return { dataUrl: await fileToStoredDataUrl(file) };
-  if (file.type.startsWith("video/") || file.type.startsWith("audio/") || /\.(mov|mp4|m4v|mp3|aac|m4a)$/i.test(file.name)) {
-    return uploadMediaFile(file, id);
+function uploadDuplicateKey(file) {
+  return `${safeUploadName(file).toLowerCase()}|${file.size || 0}`;
+}
+
+function existingUploadKeys() {
+  const keys = new Set();
+  allLogos().forEach((logo) => {
+    if (logo.uploading || logo.uploadError) return;
+    if (logo.duplicateKey) keys.add(logo.duplicateKey);
+    if (logo.name && logo.size) keys.add(`${safeUploadName({ name: logo.name }).toLowerCase()}|${logo.size}`);
+    if (logo.name) keys.add(`name:${String(logo.name).toLowerCase()}`);
+  });
+  return keys;
+}
+
+function updateUploadPlaceholder(id, patch) {
+  if (!addedItems[id]) return;
+  addedItems[id] = { ...addedItems[id], ...patch };
+  render();
+}
+
+async function fileToStoredSource(file, id, onProgress) {
+  if (file.type.startsWith("image/") && file.size > 350000) return uploadMediaFile(file, id, onProgress);
+  if (file.type.startsWith("image/")) {
+    onProgress?.(18);
+    const dataUrl = await fileToStoredDataUrl(file);
+    onProgress?.(99);
+    return { dataUrl };
   }
-  return { dataUrl: await fileToStoredDataUrl(file) };
+  if (file.type.startsWith("video/") || file.type.startsWith("audio/") || /\.(mov|mp4|m4v|mp3|aac|m4a)$/i.test(file.name)) {
+    return uploadMediaFile(file, id, onProgress);
+  }
+  onProgress?.(18);
+  const dataUrl = await fileToStoredDataUrl(file);
+  onProgress?.(99);
+  return { dataUrl };
 }
 
 async function addFiles(files) {
   let comment = document.querySelector("#newUploadComment")?.value.trim() || "";
   if (comment && !/^[RA]:\s/.test(comment)) comment = `${currentCommentPrefix()} ${comment}`;
-  const addedPatch = {};
-  const reviewPatch = {};
-  for (const file of Array.from(files)) {
+  const incomingFiles = Array.from(files);
+  const seen = existingUploadKeys();
+  const uploads = incomingFiles.map((file) => {
     const id = `added-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    let storedSource;
-    try {
-      storedSource = await fileToStoredSource(file, id);
-    } catch (error) {
-      console.error("Upload failed", error);
-      storedSource = { uploadError: true };
-    }
+    const duplicateKey = uploadDuplicateKey(file);
+    const nameKey = `name:${String(file.name || "").toLowerCase()}`;
+    const duplicateUpload = seen.has(duplicateKey) || seen.has(nameKey);
+    seen.add(duplicateKey);
+    seen.add(nameKey);
     const item = {
       id,
       file: id,
@@ -980,19 +1044,47 @@ async function addFiles(files) {
       group: "TOEGEVOEGD",
       added: true,
       type: file.type || "application/octet-stream",
+      size: file.size || 0,
+      duplicateKey,
+      duplicateUpload,
+      uploading: true,
+      uploadProgress: 0,
+    };
+    addedItems[id] = item;
+    if (comment) reviewState[id] = { ...(reviewState[id] || {}), comment, commentOpen: true };
+    return { file, id };
+  });
+  render();
+
+  for (const { file, id } of uploads) {
+    let storedSource;
+    const persistPatch = {};
+    const reviewPatch = {};
+    try {
+      storedSource = await fileToStoredSource(file, id, (progress) => {
+        const current = addedItems[id]?.uploadProgress || 0;
+        if (progress >= 99 || progress - current >= 3) updateUploadPlaceholder(id, { uploadProgress: progress });
+      });
+    } catch (error) {
+      console.error("Upload failed", error);
+      storedSource = { uploadError: true };
+    }
+    const item = {
+      ...addedItems[id],
+      uploading: false,
+      uploadProgress: storedSource.uploadError ? 0 : 100,
       ...storedSource,
     };
     addedItems[id] = item;
-    addedPatch[id] = item;
-    if (comment) {
-      reviewState[id] = { ...(reviewState[id] || {}), comment, commentOpen: true };
+    persistPatch[id] = item;
+    if (reviewState[id]) {
       reviewPatch[id] = reviewState[id];
     }
+    saveAddedItems();
+    saveReview();
+    queuePersist({ addedItems: persistPatch, review: reviewPatch });
+    render();
   }
-  saveAddedItems();
-  saveReview();
-  queuePersist({ addedItems: addedPatch, review: reviewPatch });
-  render();
 }
 
 function resetSheetCutter(closeDialog = false) {

@@ -345,21 +345,24 @@ body > div {
   white-space: nowrap;
 }
 
-.sheet-stage {
+.sheet-stage,
+.capture-stage {
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #ffffff;
 }
 
-#sheetCanvas {
+#sheetCanvas,
+#captureCanvas {
   display: block;
   width: 100%;
   height: min(52vh, 520px);
   touch-action: none;
 }
 
-.sheet-actions {
+.sheet-actions,
+.capture-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
@@ -368,6 +371,12 @@ body > div {
 .sheet-cut {
   min-width: 58px;
   background: var(--voter-green);
+}
+
+#captureSaveButton {
+  min-width: 58px;
+  background: var(--dark);
+  color: #ffffff;
 }
 
 .topbar {
@@ -520,6 +529,7 @@ main {
 .crop-actions button,
 .crop-footer button,
 .edit-logo,
+.capture-logo,
 .sheet-logo,
 .undo-card,
 .delete-logo,
@@ -546,6 +556,7 @@ main {
 .crop-actions button:focus-visible,
 .crop-footer button:focus-visible,
 .edit-logo:focus-visible,
+.capture-logo:focus-visible,
 .sheet-logo:focus-visible,
 .undo-card:focus-visible,
 .delete-logo:focus-visible,
@@ -976,6 +987,7 @@ main {
 }
 
 .edit-logo,
+.capture-logo,
 .sheet-logo {
   display: grid;
   place-items: center;

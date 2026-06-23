@@ -25,6 +25,13 @@ const sheetContext = sheetCanvas.getContext("2d");
 const sheetResetButton = document.querySelector("#sheetResetButton");
 const sheetCutButton = document.querySelector("#sheetCutButton");
 const sheetStatus = document.querySelector("#sheetStatus");
+const captureDialog = document.querySelector("#captureDialog");
+const captureTitle = document.querySelector("#captureTitle");
+const captureCanvas = document.querySelector("#captureCanvas");
+const captureContext = captureCanvas.getContext("2d");
+const captureResetButton = document.querySelector("#captureResetButton");
+const captureSaveButton = document.querySelector("#captureSaveButton");
+const captureStatus = document.querySelector("#captureStatus");
 const gallery = document.querySelector("#gallery");
 const count = document.querySelector("#count");
 const controls = document.querySelector(".controls");
@@ -106,6 +113,12 @@ let sheetBoxes = [];
 let sheetImageRect = { x: 0, y: 0, width: 1, height: 1, scale: 1 };
 let sheetPointer = null;
 let activeSheetLogo = null;
+let captureImage = null;
+let captureImageName = "";
+let captureBox = { x: 0, y: 0, width: 1, height: 1 };
+let captureImageRect = { x: 0, y: 0, width: 1, height: 1, scale: 1 };
+let capturePointer = null;
+let activeCaptureLogo = null;
 let lastCreatedProject = null;
 let ratingRequestSerial = 0;
 const latestRatingRequest = new Map();
@@ -389,6 +402,7 @@ function visibleLogos() {
 }
 
 function logoUploadOrder(logo, fallbackIndex) {
+  if (Number.isFinite(Number(logo.manualOrder))) return Number(logo.manualOrder);
   const id = String(logo.id || "");
   const timestamp = id.match(/^(?:added|sheet)-(\d+)/)?.[1];
   if (timestamp) return Number(timestamp);
@@ -821,6 +835,7 @@ function render() {
             </div>
             <div class="card-actions">
               ${croppable ? `<button class="edit-logo" type="button" data-id="${logo.id}" aria-label="Bijsnijden">🪚</button>` : ""}
+              ${croppable ? `<button class="capture-logo" type="button" data-action="capture" data-id="${logo.id}" aria-label="Single capture">📸</button>` : ""}
               ${croppable && logo.added ? `<button class="sheet-logo" type="button" data-action="sheet-cut" data-id="${logo.id}" aria-label="Sheet cut-up">✂️</button>` : ""}
               <button class="undo-card" type="button" data-action="undo" data-id="${logo.id}" ${cropHistory[logoStateKey(logo)]?.length ? "" : "disabled"}>↩️</button>
               <button class="delete-logo ${review.deleted ? "is-restore" : ""}" type="button" data-action="delete" data-id="${logo.id}">${review.deleted ? "Herstel" : "☠️"}</button>
@@ -1826,6 +1841,255 @@ async function cutSheetIntoProject() {
   render();
 }
 
+function resetCaptureTool(closeDialog = false) {
+  captureImage = null;
+  captureImageName = "";
+  captureBox = { x: 0, y: 0, width: 1, height: 1 };
+  capturePointer = null;
+  activeCaptureLogo = null;
+  captureStatus.textContent = "";
+  captureContext.clearRect(0, 0, captureCanvas.width, captureCanvas.height);
+  if (closeDialog && captureDialog.open) captureDialog.close();
+}
+
+function defaultCaptureBox(image) {
+  const width = Math.max(48, image.naturalWidth * 0.36);
+  const height = Math.max(48, image.naturalHeight * 0.36);
+  return {
+    x: (image.naturalWidth - width) / 2,
+    y: (image.naturalHeight - height) / 2,
+    width,
+    height,
+  };
+}
+
+function resetCaptureBox() {
+  if (!captureImage) return;
+  capturePointer = null;
+  captureBox = defaultCaptureBox(captureImage);
+  captureStatus.textContent = "Trek of sleep het zwarte vak om 1 beeld.";
+  drawCaptureTool();
+}
+
+function resizeCaptureCanvas() {
+  const bounds = captureCanvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  captureCanvas.width = Math.max(560, Math.round((bounds.width || 840) * dpr));
+  captureCanvas.height = Math.max(360, Math.round((bounds.height || 520) * dpr));
+}
+
+function calculateCaptureImageRect() {
+  const canvasRatio = captureCanvas.width / captureCanvas.height;
+  const imageRatio = captureImage.naturalWidth / captureImage.naturalHeight;
+  let width;
+  let height;
+  if (imageRatio > canvasRatio) {
+    width = captureCanvas.width;
+    height = width / imageRatio;
+  } else {
+    height = captureCanvas.height;
+    width = height * imageRatio;
+  }
+  return {
+    x: (captureCanvas.width - width) / 2,
+    y: (captureCanvas.height - height) / 2,
+    width,
+    height,
+    scale: width / captureImage.naturalWidth,
+  };
+}
+
+function captureBoxToCanvasRect(box = captureBox) {
+  return {
+    x: captureImageRect.x + box.x * captureImageRect.scale,
+    y: captureImageRect.y + box.y * captureImageRect.scale,
+    width: box.width * captureImageRect.scale,
+    height: box.height * captureImageRect.scale,
+  };
+}
+
+function captureHandlePoints(rect) {
+  return [
+    { name: "nw", x: rect.x, y: rect.y },
+    { name: "ne", x: rect.x + rect.width, y: rect.y },
+    { name: "sw", x: rect.x, y: rect.y + rect.height },
+    { name: "se", x: rect.x + rect.width, y: rect.y + rect.height },
+  ];
+}
+
+function drawCaptureTool() {
+  captureContext.clearRect(0, 0, captureCanvas.width, captureCanvas.height);
+  captureContext.fillStyle = "#f4f1ea";
+  captureContext.fillRect(0, 0, captureCanvas.width, captureCanvas.height);
+  if (!captureImage) return;
+  captureImageRect = calculateCaptureImageRect();
+  captureContext.drawImage(captureImage, captureImageRect.x, captureImageRect.y, captureImageRect.width, captureImageRect.height);
+  const rect = captureBoxToCanvasRect();
+  captureContext.save();
+  captureContext.fillStyle = "rgba(0, 0, 0, 0.22)";
+  captureContext.beginPath();
+  captureContext.rect(0, 0, captureCanvas.width, captureCanvas.height);
+  captureContext.rect(rect.x, rect.y, rect.width, rect.height);
+  captureContext.fill("evenodd");
+  captureContext.lineWidth = 4;
+  captureContext.strokeStyle = "#000000";
+  captureContext.strokeRect(rect.x, rect.y, rect.width, rect.height);
+  captureContext.fillStyle = "#000000";
+  captureHandlePoints(rect).forEach(({ x, y }) => {
+    captureContext.beginPath();
+    captureContext.arc(x, y, 10, 0, Math.PI * 2);
+    captureContext.fill();
+  });
+  captureContext.restore();
+}
+
+function getCapturePoint(event) {
+  const bounds = captureCanvas.getBoundingClientRect();
+  return {
+    x: ((event.clientX - bounds.left) / bounds.width) * captureCanvas.width,
+    y: ((event.clientY - bounds.top) / bounds.height) * captureCanvas.height,
+  };
+}
+
+function captureCanvasPointToImage(point) {
+  return {
+    x: Math.max(0, Math.min(captureImage.naturalWidth, (point.x - captureImageRect.x) / captureImageRect.scale)),
+    y: Math.max(0, Math.min(captureImage.naturalHeight, (point.y - captureImageRect.y) / captureImageRect.scale)),
+  };
+}
+
+function hitTestCapture(point) {
+  const rect = captureBoxToCanvasRect();
+  const handle = captureHandlePoints(rect).find((item) => Math.hypot(item.x - point.x, item.y - point.y) < 20);
+  if (handle) return { mode: "resize", handle: handle.name };
+  if (point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height) {
+    return { mode: "move" };
+  }
+  return { mode: "draw" };
+}
+
+function clampCaptureBox(box) {
+  const next = { ...box };
+  next.width = Math.max(24, Math.min(captureImage.naturalWidth, next.width));
+  next.height = Math.max(24, Math.min(captureImage.naturalHeight, next.height));
+  next.x = Math.max(0, Math.min(captureImage.naturalWidth - next.width, next.x));
+  next.y = Math.max(0, Math.min(captureImage.naturalHeight - next.height, next.y));
+  return next;
+}
+
+function updateCaptureBoxFromPointer(event) {
+  if (!capturePointer || !captureImage) return;
+  const point = getCapturePoint(event);
+  const imagePoint = captureCanvasPointToImage(point);
+  let next = { ...capturePointer.startBox };
+  if (capturePointer.mode === "move") {
+    const dx = (point.x - capturePointer.startPoint.x) / captureImageRect.scale;
+    const dy = (point.y - capturePointer.startPoint.y) / captureImageRect.scale;
+    next.x += dx;
+    next.y += dy;
+  } else if (capturePointer.mode === "resize") {
+    const dx = (point.x - capturePointer.startPoint.x) / captureImageRect.scale;
+    const dy = (point.y - capturePointer.startPoint.y) / captureImageRect.scale;
+    if (capturePointer.handle.includes("w")) {
+      next.x += dx;
+      next.width -= dx;
+    }
+    if (capturePointer.handle.includes("e")) next.width += dx;
+    if (capturePointer.handle.includes("n")) {
+      next.y += dy;
+      next.height -= dy;
+    }
+    if (capturePointer.handle.includes("s")) next.height += dy;
+  } else {
+    const start = capturePointer.startImagePoint;
+    next = {
+      x: Math.min(start.x, imagePoint.x),
+      y: Math.min(start.y, imagePoint.y),
+      width: Math.abs(imagePoint.x - start.x),
+      height: Math.abs(imagePoint.y - start.y),
+    };
+  }
+  captureBox = clampCaptureBox(next);
+  drawCaptureTool();
+}
+
+async function openCaptureTool(logo) {
+  captureStatus.textContent = "";
+  captureSaveButton.disabled = false;
+  activeCaptureLogo = logo;
+  captureTitle.textContent = logo.name || `Image ${logo.id}`;
+  const image = await loadImageFromUrl(imageSource(logo));
+  captureImage = image;
+  captureImageName = logo.name || logo.source || `capture-${logo.id}`;
+  captureBox = defaultCaptureBox(image);
+  if (!captureDialog.open) captureDialog.showModal();
+  setTimeout(() => {
+    resizeCaptureCanvas();
+    drawCaptureTool();
+    captureStatus.textContent = "Trek of sleep het zwarte vak om 1 beeld.";
+  }, 0);
+}
+
+function makeCaptureDataUrl(box) {
+  const output = document.createElement("canvas");
+  const clamped = clampCaptureBox(box);
+  const maxSide = 1200;
+  const scale = Math.min(1, maxSide / Math.max(clamped.width, clamped.height));
+  output.width = Math.max(1, Math.round(clamped.width * scale));
+  output.height = Math.max(1, Math.round(clamped.height * scale));
+  const context = output.getContext("2d");
+  context.imageSmoothingQuality = "high";
+  context.drawImage(captureImage, clamped.x, clamped.y, clamped.width, clamped.height, 0, 0, output.width, output.height);
+  return output.toDataURL("image/jpeg", 0.92);
+}
+
+function dataUrlSize(dataUrl) {
+  const body = String(dataUrl || "").split(",")[1] || "";
+  return Math.round((body.length * 3) / 4);
+}
+
+async function saveCaptureAsset() {
+  if (!captureImage || !activeCaptureLogo) return;
+  captureSaveButton.disabled = true;
+  await persistQueue.catch(() => {});
+  const id = `capture-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const dataUrl = makeCaptureDataUrl(captureBox);
+  const parentOrder = logoUploadOrder(activeCaptureLogo, allLogos().findIndex((logo) => logoStateKey(logo) === logoStateKey(activeCaptureLogo)));
+  const item = {
+    id,
+    file: id,
+    name: `${captureImageName} 📸`,
+    source: captureImageName,
+    sourceIndex: "📸",
+    dotIndex: "",
+    group: "TOEGEVOEGD",
+    added: true,
+    type: "image/jpeg",
+    size: dataUrlSize(dataUrl),
+    dataUrl,
+    manualOrder: parentOrder + 0.01,
+    captureParentKey: logoStateKey(activeCaptureLogo),
+  };
+  const fileNameTags = tagsFromFileName(captureImageName);
+  const review = fileNameTags.length ? { customTags: uniqueTags([...inferredTags(item), ...fileNameTags]) } : {};
+  const response = await fetch(`/api/state?project=${encodeURIComponent(activeProjectId)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ addedItems: { [id]: item }, review: { [id]: review } }),
+  });
+  captureSaveButton.disabled = false;
+  if (!response.ok) {
+    captureStatus.textContent = "Capture opslaan mislukte.";
+    return;
+  }
+  applyState(await response.json());
+  resetCaptureTool(true);
+  activeFilter = "all";
+  activeSort = "upload-asc";
+  localStorage.setItem(sortStoreKey, activeSort);
+  render();
+}
+
 function openCropper(logo) {
   if (!isImageLogo(logo)) return;
   activeLogo = logo;
@@ -2198,6 +2462,9 @@ gallery.addEventListener("click", async (event) => {
     if (action.dataset.action === "sheet-cut") {
       openSheetCutter(logo);
     }
+    if (action.dataset.action === "capture") {
+      openCaptureTool(logo);
+    }
     return;
   }
   const imageButton = event.target.closest(".image-button[data-id]");
@@ -2303,6 +2570,35 @@ sheetCanvas.addEventListener("pointercancel", () => {
   sheetPointer = null;
 });
 
+captureResetButton.addEventListener("click", resetCaptureBox);
+captureSaveButton.addEventListener("click", saveCaptureAsset);
+
+captureCanvas.addEventListener("pointerdown", (event) => {
+  if (!captureImage) return;
+  const startPoint = getCapturePoint(event);
+  const hit = hitTestCapture(startPoint);
+  captureCanvas.setPointerCapture(event.pointerId);
+  capturePointer = {
+    ...hit,
+    startPoint,
+    startImagePoint: captureCanvasPointToImage(startPoint),
+    startBox: { ...captureBox },
+  };
+  if (hit.mode === "draw") {
+    const imagePoint = captureCanvasPointToImage(startPoint);
+    captureBox = clampCaptureBox({ x: imagePoint.x, y: imagePoint.y, width: 24, height: 24 });
+    drawCaptureTool();
+  }
+});
+
+captureCanvas.addEventListener("pointermove", updateCaptureBoxFromPointer);
+captureCanvas.addEventListener("pointerup", () => {
+  capturePointer = null;
+});
+captureCanvas.addEventListener("pointercancel", () => {
+  capturePointer = null;
+});
+
 cropCanvas.addEventListener("pointerdown", (event) => {
   if (!activeImage) return;
   cropCanvas.setPointerCapture(event.pointerId);
@@ -2376,8 +2672,18 @@ window.addEventListener("resize", () => {
   drawSheetCutter();
 });
 
+window.addEventListener("resize", () => {
+  if (!captureImage || !captureDialog.open) return;
+  resizeCaptureCanvas();
+  drawCaptureTool();
+});
+
 sheetDialog.addEventListener("close", () => {
   if (!sheetCutButton.disabled) resetSheetCutter(false);
+});
+
+captureDialog.addEventListener("close", () => {
+  if (!captureSaveButton.disabled) resetCaptureTool(false);
 });
 
 toggleTextEdit.addEventListener("click", () => setTextEditMode(true));

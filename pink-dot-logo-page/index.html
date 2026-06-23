@@ -182,6 +182,26 @@
       </div>
       <p id="sheetStatus" class="crop-meta" role="alert"></p>
     </dialog>
+
+    <dialog id="captureDialog" class="crop-dialog capture-dialog">
+      <form method="dialog">
+        <button class="close" aria-label="Sluiten">×</button>
+      </form>
+      <div class="crop-head">
+        <div>
+          <p class="eyebrow">Single capture</p>
+          <h2 id="captureTitle">📸</h2>
+        </div>
+      </div>
+      <div class="capture-stage">
+        <canvas id="captureCanvas" width="1000" height="680"></canvas>
+      </div>
+      <div class="crop-footer capture-actions">
+        <button id="captureResetButton" type="button">Reset</button>
+        <button id="captureSaveButton" type="button">📸</button>
+      </div>
+      <p id="captureStatus" class="crop-meta" role="alert"></p>
+    </dialog>
     </div>
 
     <img class="brand-mark" src="/assets/another-dimension-logo.png" alt="ANÓTHER DIMENSION" />

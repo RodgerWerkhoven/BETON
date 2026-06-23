@@ -2130,11 +2130,12 @@ function isLikelySheetHeadingBox(box, image) {
   if (box.width > image.naturalWidth * 0.55 && box.height < image.naturalHeight * 0.12) return true;
   if (box.y < image.naturalHeight * 0.18 && box.width > image.naturalWidth * 0.16 && ratio > 3.2) return true;
   if (box.width > image.naturalWidth * 0.18 && box.height < image.naturalHeight * 0.035) return true;
+  if (box.height < image.naturalHeight * 0.075 && box.width > image.naturalWidth * 0.055 && box.width < image.naturalWidth * 0.25) return true;
   return false;
 }
 
 function splitDetectedBoxByWhitespace(box, mask, width, height, image, scale, depth = 0) {
-  if (depth > 3 || box.width < image.naturalWidth * 0.24) return [box];
+  if (depth > 5 || (box.width < image.naturalWidth * 0.12 && box.height < image.naturalHeight * 0.24)) return [box];
   const left = Math.max(0, Math.floor(box.x * scale));
   const top = Math.max(0, Math.floor(box.y * scale));
   const right = Math.min(width - 1, Math.ceil((box.x + box.width) * scale));
@@ -2146,21 +2147,49 @@ function splitDetectedBoxByWhitespace(box, mask, width, height, image, scale, de
     for (let y = top; y <= bottom; y += 1) total += mask[y * width + left + offsetX];
     return total;
   });
+  const rowProjection = Array.from({ length: boxHeight }, (_, offsetY) => {
+    let total = 0;
+    for (let x = left; x <= right; x += 1) total += mask[(top + offsetY) * width + x];
+    return total;
+  });
   const verticalRuns = lowProjectionRuns(
     columnProjection,
     Math.max(1, boxHeight * 0.055),
     Math.max(6, boxWidth * 0.018),
     Math.max(5, boxWidth * 0.06),
   ).filter((run) => run.start > boxWidth * 0.16 && run.end < boxWidth * 0.84);
-  const best = verticalRuns.sort((a, b) => (b.end - b.start) - (a.end - a.start))[0];
+  const horizontalRuns = lowProjectionRuns(
+    rowProjection,
+    Math.max(1, boxWidth * 0.052),
+    Math.max(6, boxHeight * 0.018),
+    Math.max(5, boxHeight * 0.055),
+  ).filter((run) => run.start > boxHeight * 0.10 && run.end < boxHeight * 0.90);
+  const bestVertical = verticalRuns
+    .map((run) => ({ axis: "x", run, score: (run.end - run.start + 1) / boxWidth }))
+    .sort((a, b) => b.score - a.score)[0];
+  const bestHorizontal = horizontalRuns
+    .map((run) => ({ axis: "y", run, score: (run.end - run.start + 1) / boxHeight }))
+    .sort((a, b) => b.score - a.score)[0];
+  const best = [bestVertical, bestHorizontal]
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score)[0];
   if (!best) return [box];
-  const cut = left + Math.round((best.start + best.end) / 2);
-  const minPartWidth = Math.max(36, image.naturalWidth * scale * 0.055);
-  if (cut - left < minPartWidth || right - cut < minPartWidth) return [box];
-  const parts = [
-    { x: left, y: top, width: cut - left, height: boxHeight },
-    { x: cut + 1, y: top, width: right - cut, height: boxHeight },
-  ]
+  const minPartWidth = Math.max(36, image.naturalWidth * scale * 0.045);
+  const minPartHeight = Math.max(30, image.naturalHeight * scale * 0.045);
+  const cut = best.axis === "x"
+    ? left + Math.round((best.run.start + best.run.end) / 2)
+    : top + Math.round((best.run.start + best.run.end) / 2);
+  const rawParts = best.axis === "x"
+    ? [
+      { x: left, y: top, width: cut - left, height: boxHeight },
+      { x: cut + 1, y: top, width: right - cut, height: boxHeight },
+    ]
+    : [
+      { x: left, y: top, width: boxWidth, height: cut - top },
+      { x: left, y: cut + 1, width: boxWidth, height: bottom - cut },
+    ];
+  if (rawParts.some((part) => part.width < minPartWidth || part.height < minPartHeight)) return [box];
+  const parts = rawParts
     .map((part) => maskBoxBounds(mask, width, height, part))
     .filter(Boolean)
     .map((part) => clampDetectedSheetBox({

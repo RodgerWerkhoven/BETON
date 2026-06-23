@@ -211,74 +211,6 @@ const translations = {
     guideCut: "✂️ cuts a sheet with multiple images into separate assets for rating.",
     guideCapture: "📸 lets you draw a black frame around one image; that image appears as a separate asset next to the sheet.",
   },
-  ko: {
-    addAsset: "에셋 추가",
-    assets: "에셋",
-    sortLabel: "정렬",
-    sortPopularDesc: "인기 높은 순",
-    sortPopularAsc: "인기 낮은 순",
-    sortNewestDesc: "최신순",
-    sortUploadAsc: "먼저 업로드한 순",
-    sortUploadDesc: "나중에 업로드한 순",
-    sortSizeAsc: "작은 크기부터",
-    sortSizeDesc: "큰 크기부터",
-    projects: "프로젝트",
-    logout: "로그아웃",
-    loginName: "이름",
-    loginPassword: "비밀번호",
-    loginButton: "로그인",
-    guideTitle: "큐레이터 안내",
-    makeProject: "프로젝트 만들기",
-    newProject: "새 프로젝트",
-    projectName: "프로젝트 이름:",
-    projectNamePlaceholder: "이름 입력",
-    projectPassword: "프로젝트 비밀번호:",
-    passwordPlaceholder: "비밀번호 만들기",
-    curators: "큐레이터",
-    nameLabel: "이름:",
-    namePlaceholder: "이름 입력",
-    passwordLabel: "비밀번호:",
-    makeProjectCta: "프로젝트 만들기",
-    copyProjectLink: "프로젝트 링크 복사",
-    copyLink: "링크 복사",
-    noProjects: "이 로그인에 연결된 프로젝트가 없습니다.",
-    personalLinkCopied: "개인 링크가 복사되었습니다.",
-    projectLinkCopied: "프로젝트 링크가 복사되었습니다.",
-    projectLinkFailed: "프로젝트 링크를 복사하지 못했습니다.",
-    projectDeleteLabel: "프로젝트 삭제",
-    projectDeleteConfirm: "프로젝트를 삭제할까요?",
-    projectDeleteFailed: "프로젝트를 삭제하지 못했습니다.",
-    projectDeleted: "프로젝트가 삭제되었습니다.",
-    curatorNeedsPassword: "모든 큐레이터는 이름과 비밀번호가 모두 필요합니다.",
-    projectCreateFailed: "프로젝트를 만들지 못했습니다.",
-    projectCreated: "프로젝트가 생성되었습니다. Rodger가 포함되었고 링크가 준비되었습니다.",
-    relogin: "다시 로그인하세요.",
-    loginRequired: "이 이미지를 보려면 로그인하세요.",
-    loginFailed: "이름 또는 비밀번호가 맞지 않습니다.",
-    tags: "태그",
-    nameEdit: "이름 변경",
-    nameSave: "이름 저장",
-    nameReset: "이름 초기화",
-    uploadTitle: "새 이미지, 비디오, 오디오 또는 시트",
-    uploadHint: "이 그리드에 파일 추가",
-    uploadCommentLabel: "새 업로드 메모",
-    uploadCommentPlaceholder: "먼저 메모를 쓰고 파일을 선택하세요",
-    sourceAdded: "추가됨:",
-    sourceOriginal: "출처",
-    writeComment: "여기에 의견을 쓰세요",
-    sheetCutter: "시트 커터",
-    singleCapture: "단일 캡처",
-    reset: "초기화",
-    boxesFound: "개 박스 발견.",
-    boxes: "개 박스.",
-    guideVote: "프로젝트를 열고 에셋을 확인한 뒤 이모지 버튼으로 투표하세요.",
-    guideSharedVote: "투표하려는 칸에 이미 색이 있어도 클릭하세요. 내 색이 옆에 표시됩니다.",
-    guideUndoVote: "내 투표를 다시 클릭하면 내 투표만 삭제됩니다.",
-    guideFilter: "태그나 컬러 원을 클릭해 선택을 필터링하세요.",
-    guideCrop: "🪚 이미지를 자릅니다.",
-    guideCut: "✂️ 여러 이미지가 있는 시트를 개별 평가용 에셋으로 자릅니다.",
-    guideCapture: "📸 검은 프레임으로 한 이미지를 지정하면, 그 이미지가 시트 옆에 별도 에셋으로 생깁니다.",
-  },
 };
 const ratingOptions = ["🤩", "🙂", "🆗", "🤔", "🤮"];
 const ratingScore = { "🤩": 5, "🙂": 4, "🆗": 3, "🤔": 2, "🤮": 1 };
@@ -303,7 +235,10 @@ let activeFilter = "all";
 let activeSort = localStorage.getItem(sortStoreKey) || "upload-asc";
 if (!sortOptions.has(activeSort)) activeSort = "upload-asc";
 let activeLanguage = localStorage.getItem(languageStoreKey) || "nl";
-if (!translations[activeLanguage]) activeLanguage = "nl";
+if (!translations[activeLanguage]) {
+  activeLanguage = "nl";
+  localStorage.setItem(languageStoreKey, activeLanguage);
+}
 let activeLogo = null;
 let activeImage = null;
 let activeAspect = "free";

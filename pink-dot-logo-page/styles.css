@@ -493,7 +493,7 @@ h1 {
 }
 
 .top-add-asset {
-  flex: 0 0 auto;
+  flex: 0 0 142px;
   border: 1px solid var(--dark);
   border-radius: 8px;
   background: var(--accent);
@@ -504,6 +504,7 @@ h1 {
   font-weight: 900;
   min-height: 44px;
   padding: 8px 12px;
+  text-align: center;
   white-space: nowrap;
 }
 
@@ -541,9 +542,14 @@ h1 {
   gap: 8px;
 }
 
+.top-actions > button {
+  flex: 0 0 142px;
+  text-align: center;
+}
+
 .sort-control {
   display: grid;
-  flex: 0 1 280px;
+  flex: 0 1 292px;
   gap: 3px;
   min-width: min(100%, 210px);
 }
@@ -1395,10 +1401,21 @@ main {
   .vote-filters,
   .sort-control,
   .count,
+  .top-add-asset,
   .status-filter,
   #projectOverviewButton,
-  #logoutButton {
+  #logoutButton,
+  .language-switch {
     width: 100%;
+  }
+
+  .language-switch {
+    justify-content: stretch;
+  }
+
+  .language-switch button {
+    flex: 1 1 0;
+    width: auto;
   }
 
   .sort-control select {

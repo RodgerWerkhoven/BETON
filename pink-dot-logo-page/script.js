@@ -1718,6 +1718,71 @@ function dilateMask(mask, width, height, rounds = 2) {
   return current;
 }
 
+function removeLinearSheetRules(mask, width, height) {
+  const cleaned = new Uint8Array(mask);
+  const rowNeighborDensity = (y, start, end) => {
+    let active = 0;
+    let total = 0;
+    [y - 3, y + 3].forEach((yy) => {
+      if (yy < 0 || yy >= height) return;
+      for (let x = start; x <= end; x += 1) {
+        active += mask[yy * width + x];
+        total += 1;
+      }
+    });
+    return total ? active / total : 0;
+  };
+  const columnNeighborDensity = (x, start, end) => {
+    let active = 0;
+    let total = 0;
+    [x - 3, x + 3].forEach((xx) => {
+      if (xx < 0 || xx >= width) return;
+      for (let y = start; y <= end; y += 1) {
+        active += mask[y * width + xx];
+        total += 1;
+      }
+    });
+    return total ? active / total : 0;
+  };
+  const removeRowRun = (y, start, end) => {
+    for (let yy = Math.max(0, y - 1); yy <= Math.min(height - 1, y + 1); yy += 1) {
+      for (let x = start; x <= end; x += 1) cleaned[yy * width + x] = 0;
+    }
+  };
+  const removeColumnRun = (x, start, end) => {
+    for (let xx = Math.max(0, x - 1); xx <= Math.min(width - 1, x + 1); xx += 1) {
+      for (let y = start; y <= end; y += 1) cleaned[y * width + xx] = 0;
+    }
+  };
+  const minHorizontalRun = Math.max(60, Math.round(width * 0.18));
+  const minVerticalRun = Math.max(60, Math.round(height * 0.18));
+  for (let y = 0; y < height; y += 1) {
+    let start = null;
+    for (let x = 0; x < width; x += 1) {
+      const active = Boolean(mask[y * width + x]);
+      if (active && start === null) start = x;
+      if ((!active || x === width - 1) && start !== null) {
+        const end = active && x === width - 1 ? x : x - 1;
+        if (end - start + 1 >= minHorizontalRun && rowNeighborDensity(y, start, end) < 0.18) removeRowRun(y, start, end);
+        start = null;
+      }
+    }
+  }
+  for (let x = 0; x < width; x += 1) {
+    let start = null;
+    for (let y = 0; y < height; y += 1) {
+      const active = Boolean(mask[y * width + x]);
+      if (active && start === null) start = y;
+      if ((!active || y === height - 1) && start !== null) {
+        const end = active && y === height - 1 ? y : y - 1;
+        if (end - start + 1 >= minVerticalRun && columnNeighborDensity(x, start, end) < 0.18) removeColumnRun(x, start, end);
+        start = null;
+      }
+    }
+  }
+  return cleaned;
+}
+
 function boxesNear(a, b, gap) {
   return !(
     a.x + a.width + gap < b.x ||
@@ -1940,7 +2005,7 @@ function isTextLikeSheetComponent(component, width, height) {
   const ratio = component.width / Math.max(1, component.height);
   const density = component.area / Math.max(1, component.width * component.height);
   if (component.width > width * 0.42 && component.height < height * 0.13) return true;
-  if (component.width > width * 0.2 && component.height < height * 0.055) return true;
+  if (component.width > width * 0.2 && component.height < height * 0.045) return true;
   if (component.height < height * 0.022 && component.width > width * 0.045) return true;
   if (ratio > 8 && component.height < height * 0.09) return true;
   if (density < 0.018 && component.width > width * 0.08) return true;
@@ -2046,13 +2111,61 @@ function splitSampleBoxByGaps(box, mask, width, height, depth = 0) {
 function isLikelySheetHeadingBox(box, image) {
   const ratio = box.width / Math.max(1, box.height);
   if (box.width > image.naturalWidth * 0.55 && box.height < image.naturalHeight * 0.12) return true;
-  if (box.y < image.naturalHeight * 0.18 && box.width > image.naturalWidth * 0.25 && ratio > 4) return true;
+  if (box.y < image.naturalHeight * 0.18 && box.width > image.naturalWidth * 0.16 && ratio > 3.2) return true;
   if (box.width > image.naturalWidth * 0.18 && box.height < image.naturalHeight * 0.035) return true;
   return false;
 }
 
+function splitDetectedBoxByWhitespace(box, mask, width, height, image, scale, depth = 0) {
+  if (depth > 3 || box.width < image.naturalWidth * 0.24) return [box];
+  const left = Math.max(0, Math.floor(box.x * scale));
+  const top = Math.max(0, Math.floor(box.y * scale));
+  const right = Math.min(width - 1, Math.ceil((box.x + box.width) * scale));
+  const bottom = Math.min(height - 1, Math.ceil((box.y + box.height) * scale));
+  const boxWidth = right - left + 1;
+  const boxHeight = bottom - top + 1;
+  const columnProjection = Array.from({ length: boxWidth }, (_, offsetX) => {
+    let total = 0;
+    for (let y = top; y <= bottom; y += 1) total += mask[y * width + left + offsetX];
+    return total;
+  });
+  const verticalRuns = lowProjectionRuns(
+    columnProjection,
+    Math.max(1, boxHeight * 0.055),
+    Math.max(6, boxWidth * 0.018),
+    Math.max(5, boxWidth * 0.06),
+  ).filter((run) => run.start > boxWidth * 0.16 && run.end < boxWidth * 0.84);
+  const best = verticalRuns.sort((a, b) => (b.end - b.start) - (a.end - a.start))[0];
+  if (!best) return [box];
+  const cut = left + Math.round((best.start + best.end) / 2);
+  const minPartWidth = Math.max(36, image.naturalWidth * scale * 0.055);
+  if (cut - left < minPartWidth || right - cut < minPartWidth) return [box];
+  const parts = [
+    { x: left, y: top, width: cut - left, height: boxHeight },
+    { x: cut + 1, y: top, width: right - cut, height: boxHeight },
+  ]
+    .map((part) => maskBoxBounds(mask, width, height, part))
+    .filter(Boolean)
+    .map((part) => clampDetectedSheetBox({
+      x: part.x / scale,
+      y: part.y / scale,
+      width: part.width / scale,
+      height: part.height / scale,
+    }, image))
+    .filter((part) => part.width > Math.max(30, image.naturalWidth * 0.04) && part.height > Math.max(30, image.naturalHeight * 0.04));
+  if (parts.length < 2) return [box];
+  return parts.flatMap((part) => splitDetectedBoxByWhitespace(part, mask, width, height, image, scale, depth + 1));
+}
+
+function refineDetectedSheetBoxes(boxes, mask, width, height, image, scale) {
+  return sortBoxesReadingOrder(boxes
+    .filter((box) => !isLikelySheetHeadingBox(box, image))
+    .flatMap((box) => splitDetectedBoxByWhitespace(box, mask, width, height, image, scale))
+    .filter((box) => !isLikelySheetHeadingBox(box, image)));
+}
+
 function smartComponentSheetBoxes(mask, width, height, image, scale) {
-  const minRawArea = Math.max(14, Math.round(width * height * 0.000025));
+  const minRawArea = Math.max(10, Math.round(width * height * 0.000018));
   const rawComponents = rawMaskComponents(mask, width, height, minRawArea)
     .filter((component) => !isTextLikeSheetComponent(component, width, height));
   if (!rawComponents.length) return [];
@@ -2065,8 +2178,8 @@ function smartComponentSheetBoxes(mask, width, height, image, scale) {
       }
     }
   });
-  const clusteredMask = dilateMask(filteredMask, width, height, 2);
-  const clustered = rawMaskComponents(clusteredMask, width, height, Math.max(80, width * height * 0.00016));
+  const clusteredMask = dilateMask(filteredMask, width, height, 4);
+  const clustered = rawMaskComponents(clusteredMask, width, height, Math.max(46, width * height * 0.00008));
   const pad = sheetDetectionPad(width, height);
   const boxes = clustered
     .flatMap((component) => splitSampleBoxByGaps(maskBoxBounds(filteredMask, width, height, component) || component, filteredMask, width, height))
@@ -2080,8 +2193,7 @@ function smartComponentSheetBoxes(mask, width, height, image, scale) {
     .filter((box) => !isLikelySheetHeadingBox(box, image))
     .filter((box) => box.width < image.naturalWidth * 0.82 || box.height < image.naturalHeight * 0.5);
   const gap = Math.max(image.naturalWidth, image.naturalHeight) * 0.0025;
-  return sortBoxesReadingOrder(mergeBoxes(boxes, gap)
-    .filter((box) => !isLikelySheetHeadingBox(box, image))).slice(0, 80);
+  return refineDetectedSheetBoxes(mergeBoxes(boxes, gap), mask, width, height, image, scale).slice(0, 80);
 }
 
 function detectSheetBoxes(image) {
@@ -2097,20 +2209,33 @@ function detectSheetBoxes(image) {
   const pixels = context.getImageData(0, 0, width, height);
   const background = averageCornerColor(pixels.data, width, height);
   const mask = new Uint8Array(width * height);
+  const shapeMask = new Uint8Array(width * height);
+  const backgroundLuma = (background[0] * 0.299) + (background[1] * 0.587) + (background[2] * 0.114);
   for (let index = 0; index < width * height; index += 1) {
     const pixel = index * 4;
-    const diff = Math.abs(pixels.data[pixel] - background[0])
-      + Math.abs(pixels.data[pixel + 1] - background[1])
-      + Math.abs(pixels.data[pixel + 2] - background[2]);
-    if (pixels.data[pixel + 3] > 24 && diff > 78) mask[index] = 1;
+    const red = pixels.data[pixel];
+    const green = pixels.data[pixel + 1];
+    const blue = pixels.data[pixel + 2];
+    const diff = Math.abs(red - background[0])
+      + Math.abs(green - background[1])
+      + Math.abs(blue - background[2]);
+    const luma = (red * 0.299) + (green * 0.587) + (blue * 0.114);
+    const saturation = Math.max(red, green, blue) - Math.min(red, green, blue);
+    const visible = pixels.data[pixel + 3] > 24;
+    if (visible && diff > 78) mask[index] = 1;
+    if (visible && (diff > 112 || saturation > 32 || luma < backgroundLuma - 34)) shapeMask[index] = 1;
   }
-  const smart = smartComponentSheetBoxes(mask, width, height, image, scale);
+  const cleanShapeMask = removeLinearSheetRules(shapeMask, width, height);
+  const cleanMask = removeLinearSheetRules(mask, width, height);
+  const smart = smartComponentSheetBoxes(cleanShapeMask, width, height, image, scale);
   if (smart.length >= 2) return smart;
-  const projected = projectionSheetBoxes(mask, width, height, image, scale);
-  const grid = gridSheetBoxes(mask, width, height, image, scale);
-  if (projected.length > 3 && projected.length >= grid.length * 0.7) return projected;
-  if (grid.length > projected.length) return grid;
-  const dilated = dilateMask(mask, width, height, 1);
+  const broadSmart = smartComponentSheetBoxes(cleanMask, width, height, image, scale);
+  if (broadSmart.length >= 2) return broadSmart;
+  const projected = projectionSheetBoxes(cleanMask, width, height, image, scale);
+  if (projected.length >= 2) return projected;
+  const grid = gridSheetBoxes(cleanMask, width, height, image, scale);
+  if (grid.length >= 2) return grid;
+  const dilated = dilateMask(cleanMask, width, height, 1);
   const visited = new Uint8Array(width * height);
   const components = [];
   const minArea = Math.max(220, Math.round(width * height * 0.00045));

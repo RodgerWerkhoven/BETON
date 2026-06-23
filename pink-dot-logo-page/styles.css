@@ -391,10 +391,12 @@ body > div {
   top: 0;
   z-index: 5;
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) auto minmax(520px, 860px);
-  grid-template-areas: "title votes actions";
-  align-items: center;
-  gap: 16px 22px;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "title title"
+    "votes actions";
+  align-items: end;
+  gap: 12px 22px;
   padding: 18px clamp(16px, 4vw, 48px);
   border-bottom: 1px solid var(--line);
   background: rgba(244, 241, 234, 0.94);
@@ -459,9 +461,9 @@ body > div {
 .title-row {
   display: flex;
   min-width: 0;
-  align-items: flex-end;
-  gap: 12px;
-  flex-wrap: wrap;
+  align-items: end;
+  gap: 16px;
+  flex-wrap: nowrap;
 }
 
 .eyebrow {
@@ -474,6 +476,7 @@ body > div {
 }
 
 h1 {
+  flex: 0 1 auto;
   margin: 0;
   font-size: clamp(26px, 5vw, 56px);
   line-height: 0.95;
@@ -491,9 +494,9 @@ h1 {
 .top-actions {
   grid-area: actions;
   display: flex;
-  max-width: min(100%, 860px);
+  max-width: none;
   align-items: flex-end;
-  justify-content: flex-end;
+  justify-content: flex-start;
   flex-wrap: wrap;
   gap: 8px;
 }
@@ -1318,15 +1321,10 @@ main {
 
 @media (max-width: 1320px) {
   .topbar {
-    grid-template-columns: minmax(260px, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr);
     grid-template-areas:
-      "title votes"
-      "actions actions";
-  }
-
-  .top-actions {
-    max-width: none;
-    justify-content: flex-start;
+      "title title"
+      "votes actions";
   }
 }
 

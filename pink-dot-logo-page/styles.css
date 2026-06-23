@@ -1019,6 +1019,10 @@ main {
   background: #ffffff;
 }
 
+.capture-logo {
+  background: var(--capture-button-bg, var(--voter-yellow));
+}
+
 .undo-card,
 .delete-logo {
   min-width: 44px;

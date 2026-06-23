@@ -254,6 +254,7 @@ async function loadSharedState() {
     } else {
       applyState(remote);
     }
+    normalizeAddedItemNumbers({ persist: true });
   } catch (error) {
     if (String(error.message || "").includes("401")) {
       showLogin("Log in om deze images te bekijken.");
@@ -311,6 +312,49 @@ function allLogos() {
   return [...logos, ...Object.values(addedItems)];
 }
 
+function isNumberedUpload(logo) {
+  return logo?.added && !(logo.captureRootKey || logo.captureParentKey);
+}
+
+function uploadNumberLabel(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "⊕";
+  return `#${String(Math.max(0, number)).padStart(3, "0")}`;
+}
+
+function usedUploadNumbers() {
+  const used = new Set();
+  Object.values(addedItems).forEach((item) => {
+    const number = Number(item.uploadNumber);
+    if (isNumberedUpload(item) && Number.isInteger(number) && number >= 0) used.add(number);
+  });
+  return used;
+}
+
+function firstFreeUploadNumber(used) {
+  let number = 0;
+  while (used.has(number)) number += 1;
+  used.add(number);
+  return number;
+}
+
+function normalizeAddedItemNumbers(options = {}) {
+  const { persist = false } = options;
+  const used = usedUploadNumbers();
+  const patch = {};
+  Object.entries(addedItems)
+    .filter(([, item]) => isNumberedUpload(item) && !Number.isInteger(Number(item.uploadNumber)))
+    .sort(([, a], [, b]) => logoCreatedOrder(a, 0) - logoCreatedOrder(b, 0) || String(a.id || "").localeCompare(String(b.id || "")))
+    .forEach(([key, item]) => {
+      const uploadNumber = firstFreeUploadNumber(used);
+      addedItems[key] = { ...item, uploadNumber };
+      patch[key] = addedItems[key];
+    });
+  if (!Object.keys(patch).length) return;
+  writeJson(addedItemsStoreKey, addedItems);
+  if (persist) queuePersist({ addedItems: patch });
+}
+
 function findLogoByStateKey(key) {
   return allLogos().find((logo) => logoStateKey(logo) === key);
 }
@@ -318,6 +362,7 @@ function findLogoByStateKey(key) {
 function baseSheetNumberLabel(logo) {
   if (!logo) return "#??";
   if (logo.captureNumberBase) return logo.captureNumberBase;
+  if (isNumberedUpload(logo)) return uploadNumberLabel(logo.uploadNumber);
   if (!logo.added && logo.id !== undefined) return `#${String(logo.id).padStart(2, "0")}`;
   return "⊕";
 }
@@ -370,6 +415,29 @@ function logoNumberLabel(logo) {
     return `${logo.captureNumberBase || baseSheetNumberLabel(rootLogo)}${captureLetterForLogo(logo)}`;
   }
   return baseSheetNumberLabel(logo);
+}
+
+function captureColorValue(color) {
+  if (!color) return "";
+  if (typeof color === "string") return color;
+  return color.color || "";
+}
+
+function latestCaptureForLogo(logo) {
+  const key = logoStateKey(logo);
+  return relatedCaptureLogos(captureRootKey(logo))
+    .filter((capture) => capture.captureParentKey === key || capture.captureRootKey === key)
+    .sort((a, b) => logoCreatedOrder(b, 0) - logoCreatedOrder(a, 0))[0] || null;
+}
+
+function captureButtonColor(logo) {
+  if (logo.captureCreatorColor) return captureColorValue(logo.captureCreatorColor);
+  return captureColorValue(latestCaptureForLogo(logo)?.captureCreatorColor) || "";
+}
+
+function captureButtonStyle(logo) {
+  const color = captureButtonColor(logo) || "var(--voter-yellow)";
+  return `style="--capture-button-bg: ${escapeHtml(color)}"`;
 }
 
 function isImageLogo(logo) {
@@ -904,7 +972,7 @@ function render() {
             </div>
             <div class="card-actions">
               ${croppable ? `<button class="edit-logo" type="button" data-id="${logo.id}" aria-label="Bijsnijden">🪚</button>` : ""}
-              ${croppable ? `<button class="capture-logo" type="button" data-action="capture" data-id="${logo.id}" aria-label="Single capture">📸</button>` : ""}
+              ${croppable ? `<button class="capture-logo" type="button" data-action="capture" data-id="${logo.id}" aria-label="Single capture" ${captureButtonStyle(logo)}>📸</button>` : ""}
               ${croppable && logo.added ? `<button class="sheet-logo" type="button" data-action="sheet-cut" data-id="${logo.id}" aria-label="Sheet cut-up">✂️</button>` : ""}
               <button class="undo-card" type="button" data-action="undo" data-id="${logo.id}" ${cropHistory[logoStateKey(logo)]?.length ? "" : "disabled"}>↩️</button>
               <button class="delete-logo ${review.deleted ? "is-restore" : ""}" type="button" data-action="delete" data-id="${logo.id}">${review.deleted ? "Herstel" : "☠️"}</button>
@@ -1255,6 +1323,7 @@ async function addFiles(files) {
   if (comment && !/^[RA]:\s/.test(comment)) comment = `${currentCommentPrefix()} ${comment}`;
   const incomingFiles = Array.from(files);
   const seen = existingUploadKeys();
+  const uploadNumbers = usedUploadNumbers();
   const uploads = incomingFiles.map((file) => {
     const id = `added-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const duplicateKey = uploadDuplicateKey(file);
@@ -1276,6 +1345,7 @@ async function addFiles(files) {
       size: file.size || 0,
       duplicateKey,
       duplicateUpload,
+      uploadNumber: firstFreeUploadNumber(uploadNumbers),
       uploading: true,
       uploadProgress: 0,
     };
@@ -1905,6 +1975,7 @@ async function cutSheetIntoProject() {
     return;
   }
   applyState(await response.json());
+  normalizeAddedItemNumbers({ persist: true });
   resetSheetCutter(true);
   activeFilter = "all";
   render();
@@ -2000,15 +2071,24 @@ function drawCaptureTool() {
   captureContext.rect(0, 0, captureCanvas.width, captureCanvas.height);
   captureContext.rect(rect.x, rect.y, rect.width, rect.height);
   captureContext.fill("evenodd");
+  captureContext.fillStyle = "rgba(96, 212, 111, 0.72)";
+  captureContext.fillRect(rect.x, rect.y, rect.width, rect.height);
   captureContext.lineWidth = 4;
   captureContext.strokeStyle = "#000000";
   captureContext.strokeRect(rect.x, rect.y, rect.width, rect.height);
+  captureContext.fillStyle = "#000000";
+  captureContext.font = `900 ${Math.max(30, Math.min(72, Math.min(rect.width, rect.height) * 0.32))}px system-ui`;
+  captureContext.textAlign = "center";
+  captureContext.textBaseline = "middle";
+  captureContext.fillText("⊕", rect.x + rect.width / 2, rect.y + rect.height / 2);
   captureContext.fillStyle = "#000000";
   captureHandlePoints(rect).forEach(({ x, y }) => {
     captureContext.beginPath();
     captureContext.arc(x, y, 10, 0, Math.PI * 2);
     captureContext.fill();
   });
+  captureContext.textAlign = "start";
+  captureContext.textBaseline = "alphabetic";
   captureContext.restore();
 }
 
@@ -2123,6 +2203,7 @@ async function saveCaptureAsset() {
   await persistQueue.catch(() => {});
   const id = `capture-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const dataUrl = makeCaptureDataUrl(captureBox);
+  const creator = ensureCurrentVoterRegistered({ persist: false });
   const rootKey = captureRootKey(activeCaptureLogo);
   const rootLogo = findLogoByStateKey(rootKey) || activeCaptureLogo;
   const suffix = nextCaptureLetter(rootKey);
@@ -2146,13 +2227,17 @@ async function saveCaptureAsset() {
     captureParentKey: logoStateKey(activeCaptureLogo),
     captureNumberBase,
     captureSuffix: suffix,
+    captureCreatorKey: creator.key || currentVoterKey(),
+    captureCreatorColor: creator.color || colorForCurrentVoter(),
   };
   const fileNameTags = tagsFromFileName(captureImageName);
   const review = fileNameTags.length ? { customTags: uniqueTags([...inferredTags(item), ...fileNameTags]) } : {};
+  const patch = { addedItems: { [id]: item }, review: { [id]: review } };
+  if (creator.changed && creator.color) patch.voters = { [creator.key]: creator.color };
   const response = await fetch(`/api/state?project=${encodeURIComponent(activeProjectId)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ addedItems: { [id]: item }, review: { [id]: review } }),
+    body: JSON.stringify(patch),
   });
   captureSaveButton.disabled = false;
   if (!response.ok) {
@@ -2160,6 +2245,7 @@ async function saveCaptureAsset() {
     return;
   }
   applyState(await response.json());
+  normalizeAddedItemNumbers({ persist: true });
   resetCaptureTool(true);
   activeFilter = "all";
   activeSort = "upload-asc";

@@ -690,8 +690,25 @@ function latestCaptureForLogo(logo) {
 }
 
 function captureButtonColor(logo) {
+  if (logo.assetCreatorColor) return captureColorValue(logo.assetCreatorColor);
+  if (logo.sheetCreatorColor) return captureColorValue(logo.sheetCreatorColor);
   if (logo.captureCreatorColor) return captureColorValue(logo.captureCreatorColor);
   return "";
+}
+
+function creatorMetadataForCurrentVoter(prefix = "asset") {
+  const creator = ensureCurrentVoterRegistered({ persist: false });
+  const key = creator.key || currentVoterKey();
+  const color = creator.color || colorForCurrentVoter();
+  return {
+    creator,
+    metadata: {
+      assetCreatorKey: key,
+      assetCreatorColor: color,
+      [`${prefix}CreatorKey`]: key,
+      [`${prefix}CreatorColor`]: color,
+    },
+  };
 }
 
 function captureButtonStyle(logo) {
@@ -2535,6 +2552,7 @@ async function cutSheetIntoProject() {
   const addedPatch = {};
   const reviewPatch = {};
   const sheetNameTags = tagsFromFileName(sheetImageName);
+  const { creator, metadata } = creatorMetadataForCurrentVoter("sheet");
   sortBoxesReadingOrder(sheetBoxes)
     .forEach((box, index) => {
       const id = `sheet-${stamp}-${index + 1}-${Math.random().toString(36).slice(2, 7)}`;
@@ -2549,14 +2567,17 @@ async function cutSheetIntoProject() {
         added: true,
         type: "image/jpeg",
         dataUrl: makeSheetCutDataUrl(clampSheetBox(box)),
+        ...metadata,
       };
       addedPatch[id] = item;
       if (sheetNameTags.length) reviewPatch[id] = { customTags: uniqueTags([...inferredTags(item), ...sheetNameTags]) };
     });
+  const patch = { addedItems: addedPatch, review: reviewPatch };
+  if (creator.changed && creator.color) patch.voters = { [creator.key]: creator.color };
   const response = await fetch(`/api/state?project=${encodeURIComponent(projectId)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ addedItems: addedPatch, review: reviewPatch }),
+    body: JSON.stringify(patch),
   });
   sheetCutButton.disabled = false;
   if (!response.ok) {
@@ -2792,7 +2813,7 @@ async function saveCaptureAsset() {
   await persistQueue.catch(() => {});
   const id = `capture-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const dataUrl = makeCaptureDataUrl(captureBox);
-  const creator = ensureCurrentVoterRegistered({ persist: false });
+  const { creator, metadata } = creatorMetadataForCurrentVoter("capture");
   const rootKey = captureRootKey(activeCaptureLogo);
   const rootLogo = findLogoByStateKey(rootKey) || activeCaptureLogo;
   const suffix = nextCaptureLetter(rootKey);
@@ -2816,8 +2837,7 @@ async function saveCaptureAsset() {
     captureParentKey: logoStateKey(activeCaptureLogo),
     captureNumberBase,
     captureSuffix: suffix,
-    captureCreatorKey: creator.key || currentVoterKey(),
-    captureCreatorColor: creator.color || colorForCurrentVoter(),
+    ...metadata,
   };
   const fileNameTags = tagsFromFileName(captureImageName);
   const review = fileNameTags.length ? { customTags: uniqueTags([...inferredTags(item), ...fileNameTags]) } : {};

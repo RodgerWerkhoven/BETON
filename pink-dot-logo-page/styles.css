@@ -382,8 +382,8 @@ body > div {
 
 #captureSaveButton {
   min-width: 58px;
-  background: var(--dark);
-  color: #ffffff;
+  background: var(--voter-yellow);
+  color: var(--ink);
 }
 
 .topbar {

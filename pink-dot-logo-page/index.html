@@ -102,6 +102,17 @@
       </section>
       <div class="top-actions">
         <div class="count"><span id="count">43</span> assets</div>
+        <label class="sort-control">
+          <span>Volgorde</span>
+          <select id="sortSelect" aria-label="Volgorde van assets">
+            <option value="popular-desc">MEEST POPULAIR EERST</option>
+            <option value="popular-asc">MINST POPULAIR EERST</option>
+            <option value="upload-asc">EERSTE UPLOAD EERST</option>
+            <option value="upload-desc">LAATSTE UPLOAD EERST</option>
+            <option value="size-asc">OP SIZE VAN KLEIN NAAR GROOT</option>
+            <option value="size-desc">OP SIZE VAN GROOT NAAR KLEIN</option>
+          </select>
+        </label>
         <button class="status-filter" id="addedFilter" type="button" data-filter="TOEGEVOEGD">Toegevoegd</button>
         <button class="status-filter" id="deletedFilter" type="button" data-filter="deleted">Verwijderd</button>
         <button id="projectOverviewButton" type="button">Projecten</button>

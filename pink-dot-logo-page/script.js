@@ -30,6 +30,7 @@ const count = document.querySelector("#count");
 const controls = document.querySelector(".controls");
 const addedFilter = document.querySelector("#addedFilter");
 const deletedFilter = document.querySelector("#deletedFilter");
+const sortSelect = document.querySelector("#sortSelect");
 const cropDialog = document.querySelector("#cropDialog");
 const cropCanvas = document.querySelector("#cropCanvas");
 const cropContext = cropCanvas.getContext("2d");
@@ -61,7 +62,10 @@ const cropHistoryStoreKey = "beton-logo-crop-history-v1";
 const reviewStoreKey = "beton-logo-review-state-v1";
 const addedItemsStoreKey = "beton-logo-added-items-v1";
 const textStoreKey = "beton-logo-page-text-v1";
+const sortStoreKey = "beton-logo-sort-order-v1";
+const sortOptions = new Set(["popular-desc", "popular-asc", "upload-asc", "upload-desc", "size-asc", "size-desc"]);
 const ratingOptions = ["🤩", "🙂", "🆗", "🤔", "🤮"];
+const ratingScore = { "🤩": 5, "🙂": 4, "🆗": 3, "🤔": 2, "🤮": 1 };
 const voterPalette = [
   { id: "green", color: "#60d46f" },
   { id: "blue", color: "#9adfff" },
@@ -80,6 +84,8 @@ let cropHistory = readJson(cropHistoryStoreKey, {});
 let reviewState = readJson(reviewStoreKey, {});
 let addedItems = readJson(addedItemsStoreKey, {});
 let activeFilter = "all";
+let activeSort = localStorage.getItem(sortStoreKey) || "upload-asc";
+if (!sortOptions.has(activeSort)) activeSort = "upload-asc";
 let activeLogo = null;
 let activeImage = null;
 let activeAspect = "free";
@@ -380,6 +386,59 @@ function visibleLogos() {
   if (activeFilter.startsWith("vote-color-")) return active.filter((logo) => hasVoteColor(logo, activeFilter.replace("vote-color-", "")));
   if (activeFilter === "all") return active;
   return active.filter((logo) => tagsFor(logo, logoReview(logo)).includes(activeFilter));
+}
+
+function logoUploadOrder(logo, fallbackIndex) {
+  const id = String(logo.id || "");
+  const timestamp = id.match(/^(?:added|sheet)-(\d+)/)?.[1];
+  if (timestamp) return Number(timestamp);
+  return Number(logo.sourceIndex || logo.id || fallbackIndex + 1);
+}
+
+function logoSize(logo) {
+  if (Number.isFinite(Number(logo.size)) && Number(logo.size) > 0) return Number(logo.size);
+  if (Number.isFinite(Number(logo.fileSize)) && Number(logo.fileSize) > 0) return Number(logo.fileSize);
+  if (logo.dataUrl) {
+    const body = String(logo.dataUrl).split(",")[1] || "";
+    return Math.round((body.length * 3) / 4);
+  }
+  return 0;
+}
+
+function popularity(logo) {
+  const scores = Object.values(votesFor(logoReview(logo)))
+    .map((rating) => ratingScore[rating])
+    .filter(Boolean);
+  const total = scores.reduce((sum, score) => sum + score, 0);
+  return {
+    count: scores.length,
+    average: scores.length ? total / scores.length : 0,
+  };
+}
+
+function compareByFallback(a, b) {
+  return a.order - b.order;
+}
+
+function sortedVisibleLogos() {
+  const decorated = visibleLogos().map((logo, order) => ({ logo, order }));
+  decorated.sort((a, b) => {
+    if (activeSort === "popular-desc" || activeSort === "popular-asc") {
+      const left = popularity(a.logo);
+      const right = popularity(b.logo);
+      if (left.count !== right.count && (!left.count || !right.count)) return right.count - left.count;
+      if (left.average !== right.average) {
+        return activeSort === "popular-desc" ? right.average - left.average : left.average - right.average;
+      }
+      if (left.count !== right.count) return right.count - left.count;
+      return compareByFallback(a, b);
+    }
+    if (activeSort === "upload-desc") return logoUploadOrder(b.logo, b.order) - logoUploadOrder(a.logo, a.order) || compareByFallback(a, b);
+    if (activeSort === "size-asc") return logoSize(a.logo) - logoSize(b.logo) || compareByFallback(a, b);
+    if (activeSort === "size-desc") return logoSize(b.logo) - logoSize(a.logo) || compareByFallback(a, b);
+    return logoUploadOrder(a.logo, a.order) - logoUploadOrder(b.logo, b.order) || compareByFallback(a, b);
+  });
+  return decorated.map((item) => item.logo);
 }
 
 function logoReview(logo) {
@@ -710,7 +769,8 @@ function updateUndoButtons() {
 
 function render() {
   renderFilters();
-  const visible = visibleLogos();
+  if (sortSelect && sortSelect.value !== activeSort) sortSelect.value = activeSort;
+  const visible = sortedVisibleLogos();
   count.textContent = visible.length;
   const showUploadCard = activeFilter !== "deleted";
   gallery.innerHTML = `${visible
@@ -2015,6 +2075,12 @@ voteButtons.addEventListener("click", (event) => {
   const button = event.target.closest("[data-filter]");
   if (!button) return;
   setActiveFilter(activeFilter === button.dataset.filter ? "all" : button.dataset.filter);
+});
+
+sortSelect.addEventListener("change", () => {
+  activeSort = sortSelect.value;
+  localStorage.setItem(sortStoreKey, activeSort);
+  render();
 });
 
 gallery.addEventListener("click", async (event) => {

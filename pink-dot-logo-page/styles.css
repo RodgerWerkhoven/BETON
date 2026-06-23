@@ -476,6 +476,34 @@ h1 {
   gap: 8px;
 }
 
+.sort-control {
+  display: grid;
+  gap: 3px;
+  min-width: min(100%, 210px);
+}
+
+.sort-control span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.sort-control select {
+  min-height: 44px;
+  max-width: 240px;
+  border: 1px solid var(--dark);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  padding: 8px 28px 8px 10px;
+}
+
 main {
   padding: 18px clamp(16px, 4vw, 48px) 48px;
 }
@@ -534,6 +562,7 @@ main {
 .new-project-toggle:focus-visible,
 .new-project-form button:focus-visible,
 .comment textarea:focus-visible,
+.sort-control select:focus-visible,
 .filter:focus-visible,
 .close:focus-visible,
 .lightbox-dialog:focus-visible {
@@ -1265,10 +1294,16 @@ main {
 
   .top-actions,
   .vote-filters,
+  .sort-control,
   .count,
   .status-filter,
   #projectOverviewButton,
   #logoutButton {
+    width: 100%;
+  }
+
+  .sort-control select {
+    max-width: none;
     width: 100%;
   }
 

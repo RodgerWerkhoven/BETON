@@ -542,6 +542,15 @@ function uniqueTags(tags) {
   return [...new Set(tags.map(normalizeTag).filter(Boolean))];
 }
 
+function tagsFromFileName(name) {
+  const tags = [];
+  const source = String(name || "");
+  const hashtagPattern = /#([\p{L}\p{N}][\p{L}\p{N}_-]*)/gu;
+  let match;
+  while ((match = hashtagPattern.exec(source))) tags.push(match[1]);
+  return uniqueTags(tags);
+}
+
 function inferredTags(logo) {
   const text = `${logo.group || ""} ${logo.source || ""} ${logo.name || ""} ${logo.file || ""}`;
   const tags = [logo.group || "TOEGEVOEGD"];
@@ -1107,6 +1116,7 @@ async function addFiles(files) {
     const duplicateKey = uploadDuplicateKey(file);
     const nameKey = `name:${String(file.name || "").toLowerCase()}`;
     const duplicateUpload = seen.has(duplicateKey) || seen.has(nameKey);
+    const fileNameTags = tagsFromFileName(file.name);
     seen.add(duplicateKey);
     seen.add(nameKey);
     const item = {
@@ -1126,7 +1136,13 @@ async function addFiles(files) {
       uploadProgress: 0,
     };
     addedItems[id] = item;
-    if (comment) reviewState[id] = { ...(reviewState[id] || {}), comment, commentOpen: true };
+    const review = { ...(reviewState[id] || {}) };
+    if (fileNameTags.length) review.customTags = uniqueTags([...inferredTags(item), ...fileNameTags]);
+    if (comment) {
+      review.comment = comment;
+      review.commentOpen = true;
+    }
+    if (review.customTags || review.comment) reviewState[id] = review;
     return { file, id };
   });
   render();
@@ -1714,10 +1730,12 @@ async function cutSheetIntoProject() {
   await persistQueue.catch(() => {});
   const stamp = Date.now();
   const addedPatch = {};
+  const reviewPatch = {};
+  const sheetNameTags = tagsFromFileName(sheetImageName);
   sortBoxesReadingOrder(sheetBoxes)
     .forEach((box, index) => {
       const id = `sheet-${stamp}-${index + 1}-${Math.random().toString(36).slice(2, 7)}`;
-      addedPatch[id] = {
+      const item = {
         id,
         file: id,
         name: `${sheetImageName} #${index + 1}`,
@@ -1729,11 +1747,13 @@ async function cutSheetIntoProject() {
         type: "image/jpeg",
         dataUrl: makeSheetCutDataUrl(clampSheetBox(box)),
       };
+      addedPatch[id] = item;
+      if (sheetNameTags.length) reviewPatch[id] = { customTags: uniqueTags([...inferredTags(item), ...sheetNameTags]) };
     });
   const response = await fetch(`/api/state?project=${encodeURIComponent(projectId)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ addedItems: addedPatch }),
+    body: JSON.stringify({ addedItems: addedPatch, review: reviewPatch }),
   });
   sheetCutButton.disabled = false;
   if (!response.ok) {

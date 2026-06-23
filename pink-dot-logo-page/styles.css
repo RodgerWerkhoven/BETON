@@ -134,10 +134,17 @@ body > div {
   text-transform: uppercase;
 }
 
-.curator-guide p {
+.curator-guide ul {
+  display: grid;
+  gap: 3px;
   margin: 0;
+  padding-left: 18px;
   color: var(--muted);
   font-weight: 760;
+}
+
+.curator-guide li {
+  padding-left: 2px;
 }
 
 .project-main {

@@ -70,7 +70,7 @@ const reviewStoreKey = "beton-logo-review-state-v1";
 const addedItemsStoreKey = "beton-logo-added-items-v1";
 const textStoreKey = "beton-logo-page-text-v1";
 const sortStoreKey = "beton-logo-sort-order-v1";
-const sortOptions = new Set(["popular-desc", "popular-asc", "upload-asc", "upload-desc", "size-asc", "size-desc"]);
+const sortOptions = new Set(["popular-desc", "popular-asc", "newest-desc", "upload-asc", "upload-desc", "size-asc", "size-desc"]);
 const ratingOptions = ["🤩", "🙂", "🆗", "🤔", "🤮"];
 const ratingScore = { "🤩": 5, "🙂": 4, "🆗": 3, "🤔": 2, "🤮": 1 };
 const voterPalette = [
@@ -470,6 +470,13 @@ function logoUploadOrder(logo, fallbackIndex) {
   return Number(logo.sourceIndex || logo.id || fallbackIndex + 1);
 }
 
+function logoCreatedOrder(logo, fallbackIndex) {
+  const id = String(logo.id || "");
+  const timestamp = id.match(/^(?:added|sheet|capture)-(\d+)/)?.[1];
+  if (timestamp) return Number(timestamp);
+  return Number(logo.sourceIndex || logo.id || fallbackIndex + 1);
+}
+
 function logoSize(logo) {
   if (Number.isFinite(Number(logo.size)) && Number(logo.size) > 0) return Number(logo.size);
   if (Number.isFinite(Number(logo.fileSize)) && Number(logo.fileSize) > 0) return Number(logo.fileSize);
@@ -508,6 +515,7 @@ function sortedVisibleLogos() {
       if (left.count !== right.count) return right.count - left.count;
       return compareByFallback(a, b);
     }
+    if (activeSort === "newest-desc") return logoCreatedOrder(b.logo, b.order) - logoCreatedOrder(a.logo, a.order) || compareByFallback(a, b);
     if (activeSort === "upload-desc") return logoUploadOrder(b.logo, b.order) - logoUploadOrder(a.logo, a.order) || compareByFallback(a, b);
     if (activeSort === "size-asc") return logoSize(a.logo) - logoSize(b.logo) || compareByFallback(a, b);
     if (activeSort === "size-desc") return logoSize(b.logo) - logoSize(a.logo) || compareByFallback(a, b);

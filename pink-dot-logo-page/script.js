@@ -862,7 +862,7 @@ function renderProjectList() {
               <div class="project-voter">
                 <span class="project-voter-color" style="background: ${escapeHtml((invitee.color || voterPalette[0]).color)}"></span>
                 <strong>${escapeHtml(firstName(invitee.name))}</strong>
-                <small>${invitee.password ? `password: ${escapeHtml(invitee.password)}` : escapeHtml(invitee.name)}</small>
+                <small>${invitee.password ? `pass: ${escapeHtml(invitee.password)}` : escapeHtml(invitee.name)}</small>
                 <button class="project-copy voter-link-copy" type="button" data-project-copy="${escapeHtml(project.id)}" data-invite-name="${escapeHtml(invitee.name)}">COPY LINK</button>
               </div>
             `).join("")}

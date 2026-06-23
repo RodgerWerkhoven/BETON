@@ -150,7 +150,7 @@ body > div {
 
 .project-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
   gap: 12px;
 }
 
@@ -201,12 +201,14 @@ body > div {
 
 .project-actions {
   display: grid;
-  grid-template-columns: minmax(190px, 1fr) 52px;
+  grid-template-columns: minmax(0, 1fr) 52px;
   gap: 8px;
 }
 
 .project-copy {
   background: var(--card);
+  min-width: 0;
+  overflow-wrap: anywhere;
   white-space: nowrap;
 }
 
@@ -236,7 +238,7 @@ body > div {
 
 .project-voter {
   display: grid;
-  grid-template-columns: 34px minmax(0, 0.7fr) minmax(0, 1.3fr) minmax(120px, auto);
+  grid-template-columns: 34px minmax(0, 0.8fr) minmax(0, 1.2fr);
   align-items: center;
   gap: 8px;
   border: 1px solid var(--line);
@@ -261,6 +263,11 @@ body > div {
   color: var(--muted);
   font-size: 12px;
   font-weight: 800;
+}
+
+.voter-link-copy {
+  grid-column: 1 / -1;
+  width: 100%;
 }
 
 .project-tools {

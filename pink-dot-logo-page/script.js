@@ -616,6 +616,32 @@ function saveCropState(file) {
   }
 }
 
+function removeLocalAddedAsset(key) {
+  delete addedItems[key];
+  delete reviewState[key];
+  delete cropOverrides[key];
+  delete cropHistory[key];
+  saveAddedItems();
+  saveReview();
+  writeJson(cropStoreKey, cropOverrides);
+  writeJson(cropHistoryStoreKey, cropHistory);
+}
+
+async function deleteAddedAsset(logo, key) {
+  if (logo.uploading) {
+    removeLocalAddedAsset(key);
+    render();
+    return;
+  }
+  await persistQueue.catch(() => {});
+  const response = await fetch(`/api/state?project=${encodeURIComponent(activeProjectId)}&asset=${encodeURIComponent(key)}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) throw new Error(await response.text());
+  removeLocalAddedAsset(key);
+  render();
+}
+
 function pushCropHistory(file) {
   cropHistory[file] = cropHistory[file] || [];
   cropHistory[file].push(cropOverrides[file] || null);
@@ -972,7 +998,7 @@ async function uploadMediaFile(file, id, onProgress) {
   onProgress?.(99);
   return {
     url: result.url,
-    blobPathname: result.pathname || blobPathnameFromUrl(result.url) || ticket.pathname,
+    blobPathname: blobPathnameFromUrl(result.url) || result.pathname || ticket.pathname,
   };
 }
 
@@ -1984,6 +2010,14 @@ gallery.addEventListener("click", async (event) => {
         });
     }
     if (action.dataset.action === "delete") {
+      if (logo.added) {
+        if (!window.confirm(`Asset "${logo.name || logo.source || logo.id}" definitief verwijderen?`)) return;
+        deleteAddedAsset(logo, key).catch((error) => {
+          console.error("Asset delete failed", error);
+          window.alert("Asset kon niet volledig worden verwijderd.");
+        });
+        return;
+      }
       review.deleted = !review.deleted;
       reviewState[key] = review;
       saveReviewItem(key);

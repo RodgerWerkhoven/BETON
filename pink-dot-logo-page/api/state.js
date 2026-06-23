@@ -1,4 +1,4 @@
-const { get, put } = require("@vercel/blob");
+const { del, get, list, put } = require("@vercel/blob");
 const { verifySession, getDirectory, canAccessProject } = require("./auth-lib");
 
 const EMPTY_STATE = {
@@ -39,6 +39,11 @@ function requestedProject(req) {
   return url.searchParams.get("project") || url.searchParams.get("client") || "Alien";
 }
 
+function requestedAsset(req) {
+  const url = new URL(req.url || "/api/state", `https://${req.headers.host || "localhost"}`);
+  return url.searchParams.get("asset") || url.searchParams.get("id") || "";
+}
+
 async function loadState(client) {
   try {
     const result = await get(statePath(client), { access: "private", useCache: false });
@@ -68,6 +73,28 @@ async function saveState(client, state) {
   });
 }
 
+async function findSuffixedPath(path) {
+  const slash = path.lastIndexOf("/");
+  const dot = path.lastIndexOf(".");
+  if (dot <= slash) return "";
+  const prefix = `${path.slice(0, dot)}-`;
+  const extension = path.slice(dot);
+  const result = await list({ prefix, limit: 50 });
+  const candidates = result.blobs
+    .filter((blob) => blob.pathname.endsWith(extension))
+    .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
+  return candidates[0]?.pathname || "";
+}
+
+async function deleteAssetBlob(pathname) {
+  if (!pathname) return false;
+  const paths = [pathname];
+  const suffixedPath = await findSuffixedPath(pathname);
+  if (suffixedPath && !paths.includes(suffixedPath)) paths.push(suffixedPath);
+  await del(paths);
+  return true;
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   try {
@@ -94,7 +121,24 @@ module.exports = async function handler(req, res) {
       return res.status(200).json(state);
     }
 
-    res.setHeader("Allow", "GET, POST");
+    if (req.method === "DELETE") {
+      const assetId = requestedAsset(req);
+      if (!assetId) return res.status(400).json({ error: "Asset ontbreekt" });
+      const state = await loadState(projectId);
+      const item = state.addedItems[assetId];
+      if (!item) return res.status(404).json({ error: "Asset niet gevonden" });
+
+      const blobPathname = item.blobPathname || "";
+      const blobDeleted = await deleteAssetBlob(blobPathname);
+      delete state.addedItems[assetId];
+      delete state.review[assetId];
+      delete state.crops[assetId];
+      delete state.cropHistory[assetId];
+      await saveState(projectId, state);
+      return res.status(200).json({ deleted: true, asset: assetId, blobDeleted });
+    }
+
+    res.setHeader("Allow", "GET, POST, DELETE");
     return res.status(405).json({ error: "Method not allowed" });
   } catch (error) {
     return res.status(500).json({ error: error.message || "State API failed" });

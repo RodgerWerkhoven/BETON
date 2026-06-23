@@ -65,6 +65,19 @@ const lightboxImage = document.querySelector("#lightboxImage");
 const lightboxClose = document.querySelector("#lightboxClose");
 const lightboxStop = document.querySelector("#lightboxStop");
 const languageButtons = Array.from(document.querySelectorAll("[data-lang]"));
+const lightboxZoom = {
+  scale: 1,
+  x: 0,
+  y: 0,
+  pointers: new Map(),
+  startDistance: 0,
+  startMidpoint: null,
+  startScale: 1,
+  startX: 0,
+  startY: 0,
+  dragStart: null,
+  suppressClick: false,
+};
 
 const cropStoreKey = "beton-logo-crops-v2";
 const cropHistoryStoreKey = "beton-logo-crop-history-v1";
@@ -1430,6 +1443,7 @@ async function openProject(projectId) {
 function openLightbox(logo) {
   if (!logo || (!isImageLogo(logo) && !isPlayableMedia(logo))) return;
   stopMedia(lightboxDialog);
+  resetLightboxZoom();
   lightboxMediaStage.innerHTML = "";
   lightboxMediaStage.hidden = true;
   lightboxImage.hidden = true;
@@ -1456,11 +1470,102 @@ function openLightbox(logo) {
   lightboxDialog.showModal();
 }
 
+function applyLightboxZoom() {
+  lightboxImage.style.setProperty("--lightbox-scale", lightboxZoom.scale.toFixed(3));
+  lightboxImage.style.setProperty("--lightbox-x", `${Math.round(lightboxZoom.x)}px`);
+  lightboxImage.style.setProperty("--lightbox-y", `${Math.round(lightboxZoom.y)}px`);
+}
+
+function resetLightboxZoom() {
+  lightboxZoom.scale = 1;
+  lightboxZoom.x = 0;
+  lightboxZoom.y = 0;
+  lightboxZoom.pointers.clear();
+  lightboxZoom.startDistance = 0;
+  lightboxZoom.startMidpoint = null;
+  lightboxZoom.startScale = 1;
+  lightboxZoom.startX = 0;
+  lightboxZoom.startY = 0;
+  lightboxZoom.dragStart = null;
+  lightboxZoom.suppressClick = false;
+  applyLightboxZoom();
+}
+
+function lightboxPointerDistance() {
+  const points = [...lightboxZoom.pointers.values()];
+  if (points.length < 2) return 0;
+  return Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
+}
+
+function lightboxPointerMidpoint() {
+  const points = [...lightboxZoom.pointers.values()];
+  if (points.length < 2) return null;
+  return {
+    x: (points[0].x + points[1].x) / 2,
+    y: (points[0].y + points[1].y) / 2,
+  };
+}
+
+function beginLightboxGesture() {
+  if (lightboxZoom.pointers.size >= 2) {
+    lightboxZoom.startDistance = lightboxPointerDistance();
+    lightboxZoom.startMidpoint = lightboxPointerMidpoint();
+    lightboxZoom.startScale = lightboxZoom.scale;
+    lightboxZoom.startX = lightboxZoom.x;
+    lightboxZoom.startY = lightboxZoom.y;
+    lightboxZoom.suppressClick = true;
+    return;
+  }
+  const point = [...lightboxZoom.pointers.values()][0];
+  lightboxZoom.dragStart = point ? { ...point, x0: lightboxZoom.x, y0: lightboxZoom.y } : null;
+}
+
+function updateLightboxGesture(event) {
+  if (!lightboxZoom.pointers.has(event.pointerId)) return;
+  lightboxZoom.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  if (lightboxZoom.pointers.size >= 2) {
+    event.preventDefault();
+    const distance = lightboxPointerDistance();
+    const midpoint = lightboxPointerMidpoint();
+    if (!lightboxZoom.startDistance || !lightboxZoom.startMidpoint || !midpoint) beginLightboxGesture();
+    const nextScale = Math.max(1, Math.min(6, lightboxZoom.startScale * (distance / Math.max(1, lightboxZoom.startDistance))));
+    const midX = midpoint ? midpoint.x - lightboxZoom.startMidpoint.x : 0;
+    const midY = midpoint ? midpoint.y - lightboxZoom.startMidpoint.y : 0;
+    lightboxZoom.scale = nextScale;
+    lightboxZoom.x = lightboxZoom.startX + midX;
+    lightboxZoom.y = lightboxZoom.startY + midY;
+    if (lightboxZoom.scale <= 1.01) {
+      lightboxZoom.scale = 1;
+      lightboxZoom.x = 0;
+      lightboxZoom.y = 0;
+    }
+    applyLightboxZoom();
+    return;
+  }
+  if (lightboxZoom.scale <= 1 || !lightboxZoom.dragStart) return;
+  event.preventDefault();
+  const dx = event.clientX - lightboxZoom.dragStart.x;
+  const dy = event.clientY - lightboxZoom.dragStart.y;
+  if (Math.hypot(dx, dy) > 4) lightboxZoom.suppressClick = true;
+  lightboxZoom.x = lightboxZoom.dragStart.x0 + dx;
+  lightboxZoom.y = lightboxZoom.dragStart.y0 + dy;
+  applyLightboxZoom();
+}
+
+function endLightboxGesture(event) {
+  lightboxZoom.pointers.delete(event.pointerId);
+  lightboxZoom.startDistance = 0;
+  lightboxZoom.startMidpoint = null;
+  if (lightboxZoom.pointers.size) beginLightboxGesture();
+  else lightboxZoom.dragStart = null;
+}
+
 function closeLightbox() {
   stopMedia(lightboxDialog);
   lightboxMediaStage.innerHTML = "";
   lightboxMediaStage.hidden = true;
   lightboxImage.removeAttribute("src");
+  resetLightboxZoom();
   if (lightboxDialog.open) lightboxDialog.close();
 }
 
@@ -3454,7 +3559,36 @@ lightboxImage.addEventListener("error", imageFallbackHandler);
 lightboxDialog.addEventListener("click", (event) => {
   if (event.target === lightboxDialog) closeLightbox();
 });
-lightboxImage.addEventListener("click", closeLightbox);
+lightboxImage.addEventListener("pointerdown", (event) => {
+  if (lightboxImage.hidden) return;
+  lightboxImage.setPointerCapture(event.pointerId);
+  lightboxZoom.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  beginLightboxGesture();
+});
+lightboxImage.addEventListener("pointermove", updateLightboxGesture);
+lightboxImage.addEventListener("pointerup", endLightboxGesture);
+lightboxImage.addEventListener("pointercancel", endLightboxGesture);
+lightboxImage.addEventListener("wheel", (event) => {
+  if (lightboxImage.hidden) return;
+  event.preventDefault();
+  const nextScale = Math.max(1, Math.min(6, lightboxZoom.scale + (event.deltaY < 0 ? 0.18 : -0.18)));
+  lightboxZoom.scale = nextScale;
+  if (nextScale <= 1.01) {
+    lightboxZoom.scale = 1;
+    lightboxZoom.x = 0;
+    lightboxZoom.y = 0;
+  }
+  lightboxZoom.suppressClick = true;
+  applyLightboxZoom();
+}, { passive: false });
+lightboxImage.addEventListener("click", (event) => {
+  if (lightboxZoom.suppressClick) {
+    event.preventDefault();
+    lightboxZoom.suppressClick = false;
+    return;
+  }
+  closeLightbox();
+});
 lightboxClose.addEventListener("click", closeLightbox);
 lightboxStop.addEventListener("click", () => stopMedia(lightboxDialog));
 window.addEventListener("keydown", (event) => {

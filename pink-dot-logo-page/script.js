@@ -311,6 +311,67 @@ function allLogos() {
   return [...logos, ...Object.values(addedItems)];
 }
 
+function findLogoByStateKey(key) {
+  return allLogos().find((logo) => logoStateKey(logo) === key);
+}
+
+function baseSheetNumberLabel(logo) {
+  if (!logo) return "#??";
+  if (logo.captureNumberBase) return logo.captureNumberBase;
+  if (!logo.added && logo.id !== undefined) return `#${String(logo.id).padStart(2, "0")}`;
+  return "⊕";
+}
+
+function captureRootKey(logo) {
+  return logo.captureRootKey || logo.captureParentKey || logoStateKey(logo);
+}
+
+function relatedCaptureLogos(rootKey) {
+  return allLogos()
+    .filter((logo) => (logo.captureRootKey || logo.captureParentKey) === rootKey)
+    .sort((a, b) => logoUploadOrder(a, 0) - logoUploadOrder(b, 0) || String(logoStateKey(a)).localeCompare(String(logoStateKey(b))));
+}
+
+function firstFreeCaptureLetter(used) {
+  for (let index = 0; index < 26; index += 1) {
+    const letter = String.fromCharCode(65 + index);
+    if (!used.has(letter)) return letter;
+  }
+  return "Z";
+}
+
+function nextCaptureLetter(rootKey) {
+  const used = new Set();
+  relatedCaptureLogos(rootKey).forEach((logo) => {
+    if (/^[A-Z]$/.test(logo.captureSuffix || "")) used.add(logo.captureSuffix);
+    else used.add(firstFreeCaptureLetter(used));
+  });
+  return firstFreeCaptureLetter(used);
+}
+
+function captureLetterForLogo(logo) {
+  if (/^[A-Z]$/.test(logo.captureSuffix || "")) return logo.captureSuffix;
+  const rootKey = logo.captureRootKey || logo.captureParentKey;
+  if (!rootKey) return "";
+  const used = new Set();
+  let fallback = "";
+  relatedCaptureLogos(rootKey).forEach((item) => {
+    const letter = /^[A-Z]$/.test(item.captureSuffix || "") ? item.captureSuffix : firstFreeCaptureLetter(used);
+    used.add(letter);
+    if (logoStateKey(item) === logoStateKey(logo)) fallback = letter;
+  });
+  return fallback;
+}
+
+function logoNumberLabel(logo) {
+  const rootKey = logo.captureRootKey || logo.captureParentKey;
+  if (rootKey) {
+    const rootLogo = findLogoByStateKey(rootKey);
+    return `${logo.captureNumberBase || baseSheetNumberLabel(rootLogo)}${captureLetterForLogo(logo)}`;
+  }
+  return baseSheetNumberLabel(logo);
+}
+
 function isImageLogo(logo) {
   return !logo.type || logo.type.startsWith("image/");
 }
@@ -803,7 +864,7 @@ function render() {
             : renderMediaStage(logo, safeName)}
           <div class="meta">
             <div class="meta-row">
-              <span class="number">${logo.added ? "⊕" : `#${String(logo.id).padStart(2, "0")}`}</span>
+              <span class="number">${escapeHtml(logoNumberLabel(logo))}</span>
               ${renderTags(logo, review)}
             </div>
             <div class="source">${logo.added ? `Toegevoegd: ${safeSource}` : `Bron ${logo.sourceIndex}.${logo.dotIndex}: ${safeSource}`}</div>
@@ -2054,7 +2115,12 @@ async function saveCaptureAsset() {
   await persistQueue.catch(() => {});
   const id = `capture-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const dataUrl = makeCaptureDataUrl(captureBox);
-  const parentOrder = logoUploadOrder(activeCaptureLogo, allLogos().findIndex((logo) => logoStateKey(logo) === logoStateKey(activeCaptureLogo)));
+  const rootKey = captureRootKey(activeCaptureLogo);
+  const rootLogo = findLogoByStateKey(rootKey) || activeCaptureLogo;
+  const suffix = nextCaptureLetter(rootKey);
+  const suffixIndex = Math.max(1, suffix.charCodeAt(0) - 64);
+  const parentOrder = logoUploadOrder(rootLogo, allLogos().findIndex((logo) => logoStateKey(logo) === logoStateKey(rootLogo)));
+  const captureNumberBase = activeCaptureLogo.captureNumberBase || baseSheetNumberLabel(rootLogo);
   const item = {
     id,
     file: id,
@@ -2067,8 +2133,11 @@ async function saveCaptureAsset() {
     type: "image/jpeg",
     size: dataUrlSize(dataUrl),
     dataUrl,
-    manualOrder: parentOrder + 0.01,
+    manualOrder: parentOrder + suffixIndex / 100,
+    captureRootKey: rootKey,
     captureParentKey: logoStateKey(activeCaptureLogo),
+    captureNumberBase,
+    captureSuffix: suffix,
   };
   const fileNameTags = tagsFromFileName(captureImageName);
   const review = fileNameTags.length ? { customTags: uniqueTags([...inferredTags(item), ...fileNameTags]) } : {};

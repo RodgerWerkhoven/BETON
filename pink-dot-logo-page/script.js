@@ -323,7 +323,7 @@ function isNumberedUpload(logo) {
 
 function uploadNumberLabel(value) {
   const number = Number(value);
-  if (!Number.isFinite(number)) return "⊕";
+  if (!Number.isFinite(number)) return "";
   return `#${String(Math.max(0, number)).padStart(3, "0")}`;
 }
 
@@ -369,7 +369,7 @@ function baseSheetNumberLabel(logo) {
   if (logo.captureNumberBase) return logo.captureNumberBase;
   if (isNumberedUpload(logo)) return uploadNumberLabel(logo.uploadNumber);
   if (!logo.added && logo.id !== undefined) return `#${String(logo.id).padStart(2, "0")}`;
-  return "⊕";
+  return "";
 }
 
 function captureRootKey(logo) {

@@ -790,12 +790,16 @@ function tagsFor(logo, review) {
   return review.customTags ? uniqueTags(review.customTags) : inferredTags(logo);
 }
 
+function visibleTagsFor(logo, review) {
+  return tagsFor(logo, review).filter((tag) => normalizeTag(tag) !== "TOEGEVOEGD");
+}
+
 function isTagFiltered() {
   return !["all", "TOEGEVOEGD", "deleted"].includes(activeFilter) && !activeFilter.startsWith("vote-color-");
 }
 
 function renderTags(logo, review) {
-  const tags = tagsFor(logo, review);
+  const tags = visibleTagsFor(logo, review);
   const allTag = isTagFiltered()
     ? `<button class="tag tag-all" type="button" data-tag-filter="all">#ALL</button>`
     : "";
@@ -811,7 +815,7 @@ function allTagFilters() {
   const tags = new Set();
   allLogos().forEach((logo) => {
     if (reviewState[logoStateKey(logo)]?.deleted) return;
-    tagsFor(logo, logoReview(logo)).forEach((tag) => tags.add(tag));
+    visibleTagsFor(logo, logoReview(logo)).forEach((tag) => tags.add(tag));
   });
   return [...tags].sort((a, b) => a.localeCompare(b, "nl", { numeric: true }));
 }
@@ -2601,7 +2605,7 @@ gallery.addEventListener("click", async (event) => {
       render();
     }
     if (action.dataset.action === "tag-edit") {
-      const current = tagsFor(logo, review).map(tagLabel).join(", ");
+      const current = visibleTagsFor(logo, review).map(tagLabel).join(", ");
       const next = window.prompt("Tags aanpassen. Gebruik komma's, bijvoorbeeld #3D, #GRAFISCH.", current);
       if (next === null) return;
       const tags = uniqueTags(next.split(","));

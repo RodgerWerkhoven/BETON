@@ -63,6 +63,20 @@ function mergeMap(target, patch) {
   });
 }
 
+function mergeVoteUpdates(review, updates) {
+  if (!updates || typeof updates !== "object") return;
+  Object.entries(updates).forEach(([assetKey, votes]) => {
+    if (!votes || typeof votes !== "object") return;
+    const item = review[assetKey] || {};
+    const nextVotes = { ...(item.votes || {}) };
+    Object.entries(votes).forEach(([voterKey, rating]) => {
+      if (rating === null || rating === undefined || rating === "") delete nextVotes[voterKey];
+      else nextVotes[voterKey] = rating;
+    });
+    review[assetKey] = { ...item, votes: nextVotes };
+  });
+}
+
 async function saveState(client, state) {
   await put(statePath(client), JSON.stringify(state), {
     access: "private",
@@ -117,6 +131,7 @@ module.exports = async function handler(req, res) {
       mergeMap(state.addedItems, patch.addedItems);
       mergeMap(state.text, patch.text);
       mergeMap(state.voters, patch.voters);
+      mergeVoteUpdates(state.review, patch.voteUpdates);
       await saveState(projectId, state);
       return res.status(200).json(state);
     }

@@ -122,6 +122,9 @@ let activeCaptureLogo = null;
 let lastCreatedProject = null;
 let ratingRequestSerial = 0;
 const latestRatingRequest = new Map();
+let realtimeVoteTimer = null;
+let realtimeVoteInFlight = false;
+let realtimeVoteHoldUntil = 0;
 
 function showLogin(message = "") {
   loginView.hidden = false;
@@ -282,6 +285,72 @@ async function refreshReviewItem(file) {
   } catch (error) {
     console.error("Review refresh failed", error);
   }
+}
+
+function holdRealtimeVoteSync(duration = 2600) {
+  realtimeVoteHoldUntil = Math.max(realtimeVoteHoldUntil, Date.now() + duration);
+}
+
+function voteSignature(votes) {
+  return JSON.stringify(Object.fromEntries(Object.entries(votes || {}).sort(([a], [b]) => a.localeCompare(b))));
+}
+
+function mergeRealtimeVotes(remoteReview = {}, remoteVoters = {}) {
+  let changed = false;
+  const keys = new Set([...Object.keys(reviewState), ...Object.keys(remoteReview)]);
+  keys.forEach((key) => {
+    const remoteVotes = votesFor(remoteReview[key] || {});
+    const localReview = reviewState[key] || {};
+    const localVotes = votesFor(localReview);
+    if (voteSignature(remoteVotes) === voteSignature(localVotes)) return;
+    reviewState[key] = { ...localReview, votes: remoteVotes };
+    delete reviewState[key].rating;
+    delete reviewState[key].ratings;
+    changed = true;
+  });
+  if (voteSignature(remoteVoters) !== voteSignature(voterColorState)) {
+    voterColorState = remoteVoters || {};
+    changed = true;
+  }
+  if (!changed) return false;
+  writeJson(reviewStoreKey, reviewState);
+  return true;
+}
+
+function canRealtimeVoteSync() {
+  return !appView.hidden
+    && Boolean(activeProjectId)
+    && Boolean(currentSession)
+    && document.visibilityState !== "hidden"
+    && Date.now() >= realtimeVoteHoldUntil
+    && !Object.keys(pendingPatch).length;
+}
+
+async function syncRealtimeVotes() {
+  if (realtimeVoteInFlight || !canRealtimeVoteSync()) return;
+  realtimeVoteInFlight = true;
+  try {
+    const response = await fetch(`/api/state?project=${encodeURIComponent(activeProjectId)}&realtime=votes`, { cache: "no-store" });
+    if (!response.ok) throw new Error(await response.text());
+    const remote = await response.json();
+    if (mergeRealtimeVotes(remote.review, remote.voters)) render();
+  } catch (error) {
+    console.error("Realtime vote sync failed", error);
+  } finally {
+    realtimeVoteInFlight = false;
+  }
+}
+
+function startRealtimeVoteSync() {
+  stopRealtimeVoteSync();
+  realtimeVoteTimer = window.setInterval(syncRealtimeVotes, 1600);
+  window.setTimeout(syncRealtimeVotes, 600);
+}
+
+function stopRealtimeVoteSync() {
+  if (realtimeVoteTimer) window.clearInterval(realtimeVoteTimer);
+  realtimeVoteTimer = null;
+  realtimeVoteInFlight = false;
 }
 
 function escapeHtml(value) {
@@ -1133,6 +1202,7 @@ async function showProjectOverview() {
 }
 
 async function returnToProjectOverview() {
+  stopRealtimeVoteSync();
   stopMedia(document);
   if (lightboxDialog.open) closeLightbox();
   if (cropDialog.open) cropDialog.close();
@@ -2553,6 +2623,7 @@ gallery.addEventListener("click", async (event) => {
     const review = logoReview(logo);
     const key = logoStateKey(logo);
     if (action.dataset.action === "rating") {
+      holdRealtimeVoteSync();
       const voterKey = currentVoterKey();
       const voterRegistration = ensureCurrentVoterRegistered({ persist: false });
       const requestId = (ratingRequestSerial += 1);
@@ -2579,7 +2650,7 @@ gallery.addEventListener("click", async (event) => {
           delete refreshedReview.rating;
           reviewState[key] = refreshedReview;
           writeJson(reviewStoreKey, reviewState);
-          const patch = { review: { [key]: reviewState[key] || null } };
+          const patch = { voteUpdates: { [key]: { [voterKey]: shouldRemoveVote ? null : rating } } };
           if (voterRegistration.changed && voterRegistration.color) patch.voters = { [voterKey]: voterRegistration.color };
           return queuePersist(patch);
         })
@@ -2587,7 +2658,7 @@ gallery.addEventListener("click", async (event) => {
           if (result !== null && latestRatingRequest.get(key) === requestId) render();
         })
         .catch(() => {
-          schedulePersist({ review: { [key]: reviewState[key] || null } });
+          schedulePersist({ voteUpdates: { [key]: { [voterKey]: shouldRemoveVote ? null : rating } } });
         });
     }
     if (action.dataset.action === "delete") {
@@ -2992,6 +3063,7 @@ async function startApp() {
   await loadSharedState();
   setProjectTitleFallback();
   render();
+  startRealtimeVoteSync();
 }
 
 loginForm.addEventListener("submit", async (event) => {
@@ -3012,6 +3084,7 @@ loginForm.addEventListener("submit", async (event) => {
 });
 
 async function logout() {
+  stopRealtimeVoteSync();
   await fetch("/api/logout", { method: "POST" });
   currentSession = null;
   currentProjects = [];
@@ -3022,6 +3095,12 @@ async function logout() {
 logoutButton.addEventListener("click", logout);
 projectLogoutButton.addEventListener("click", logout);
 projectOverviewButton.addEventListener("click", returnToProjectOverview);
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") syncRealtimeVotes();
+});
+
+window.addEventListener("focus", syncRealtimeVotes);
 
 (async () => {
   const response = await fetch("/api/session", { cache: "no-store" });

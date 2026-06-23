@@ -2128,7 +2128,7 @@ function splitSampleBoxByGaps(box, mask, width, height, depth = 0) {
 function isLikelySheetHeadingBox(box, image) {
   const ratio = box.width / Math.max(1, box.height);
   if (box.width > image.naturalWidth * 0.55 && box.height < image.naturalHeight * 0.12) return true;
-  if (box.y < image.naturalHeight * 0.18 && box.width > image.naturalWidth * 0.16 && ratio > 3.2) return true;
+  if (box.y < image.naturalHeight * 0.18 && box.width > image.naturalWidth * 0.16 && box.height < image.naturalHeight * 0.1 && ratio > 3.2) return true;
   if (box.width > image.naturalWidth * 0.18 && box.height < image.naturalHeight * 0.035) return true;
   if (box.height < image.naturalHeight * 0.075 && box.width > image.naturalWidth * 0.055 && box.width < image.naturalWidth * 0.25) return true;
   return false;
@@ -2210,6 +2210,143 @@ function refineDetectedSheetBoxes(boxes, mask, width, height, image, scale) {
     .filter((box) => !isLikelySheetHeadingBox(box, image)));
 }
 
+function overlapLength(startA, endA, startB, endB) {
+  return Math.max(0, Math.min(endA, endB) - Math.max(startA, startB));
+}
+
+function shouldMergeSheetObjectParts(a, b, image) {
+  const aRight = a.x + a.width;
+  const aBottom = a.y + a.height;
+  const bRight = b.x + b.width;
+  const bBottom = b.y + b.height;
+  const xOverlap = overlapLength(a.x, aRight, b.x, bRight);
+  const yOverlap = overlapLength(a.y, aBottom, b.y, bBottom);
+  const xGap = Math.max(0, Math.max(a.x, b.x) - Math.min(aRight, bRight));
+  const yGap = Math.max(0, Math.max(a.y, b.y) - Math.min(aBottom, bBottom));
+  const combinedWidth = Math.max(aRight, bRight) - Math.min(a.x, b.x);
+  const combinedHeight = Math.max(aBottom, bBottom) - Math.min(a.y, b.y);
+  const giantCluster = combinedWidth > image.naturalWidth * 0.54 && combinedHeight > image.naturalHeight * 0.54;
+  if (giantCluster) return false;
+
+  const footerLogoAttachment = [a, b].some((part) => part.y > image.naturalHeight * 0.58
+    && part.height < image.naturalHeight * 0.2
+    && part.width > image.naturalWidth * 0.045)
+    && [a, b].some((part) => part.height > image.naturalHeight * 0.34);
+  const verticalObjectPart = xOverlap > Math.min(a.width, b.width) * 0.45
+    && yGap < image.naturalHeight * 0.028
+    && !footerLogoAttachment;
+  const shortLogoPart = Math.max(a.height, b.height) < image.naturalHeight * 0.19
+    && combinedHeight < image.naturalHeight * 0.22
+    && yOverlap > Math.min(a.height, b.height) * 0.42
+    && xGap < image.naturalWidth * 0.08;
+  const nestedPart = xOverlap > Math.min(a.width, b.width) * 0.9
+    && yOverlap > Math.min(a.height, b.height) * 0.9;
+
+  return verticalObjectPart || shortLogoPart || nestedPart;
+}
+
+function componentObjectSheetBoxes(mask, width, height, image, scale) {
+  const minRawArea = Math.max(10, Math.round(width * height * 0.000018));
+  const minUsefulArea = Math.max(500, Math.round(width * height * 0.00075));
+  const sourceComponents = rawMaskComponents(mask, width, height, minRawArea)
+    .filter((component) => !isTextLikeSheetComponent(component, width, height))
+    .filter((component) => {
+      const sourceWidth = component.width / scale;
+      const density = component.area / Math.max(1, component.width * component.height);
+      return !(density < 0.16 && sourceWidth > image.naturalWidth * 0.18);
+    })
+    .filter((component) => component.area >= minUsefulArea)
+    .filter((component) => component.width / scale > 28 && component.height / scale > 28);
+  let groups = sourceComponents
+    .map((component) => ({
+      x: component.x / scale,
+      y: component.y / scale,
+      width: component.width / scale,
+      height: component.height / scale,
+      area: component.area,
+    }));
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let i = 0; i < groups.length; i += 1) {
+      for (let j = i + 1; j < groups.length; j += 1) {
+        if (!shouldMergeSheetObjectParts(groups[i], groups[j], image)) continue;
+        const x = Math.min(groups[i].x, groups[j].x);
+        const y = Math.min(groups[i].y, groups[j].y);
+        const right = Math.max(groups[i].x + groups[i].width, groups[j].x + groups[j].width);
+        const bottom = Math.max(groups[i].y + groups[i].height, groups[j].y + groups[j].height);
+        groups[i] = {
+          x,
+          y,
+          width: right - x,
+          height: bottom - y,
+          area: groups[i].area + groups[j].area,
+        };
+        groups.splice(j, 1);
+        changed = true;
+        break;
+      }
+      if (changed) break;
+    }
+  }
+
+  const pad = Math.max(8, Math.round(Math.max(image.naturalWidth, image.naturalHeight) * 0.007));
+  const boxes = groups
+    .map((group) => clampDetectedSheetBox({
+      x: group.x - pad,
+      y: group.y - pad,
+      width: group.width + pad * 2,
+      height: group.height + pad * 2,
+    }, image))
+    .filter((box) => box.width > 34 && box.height > 34)
+    .filter((box) => !isLikelySheetHeadingBox(box, image));
+
+  const footerComponents = sourceComponents
+    .map((component) => ({
+      x: component.x / scale,
+      y: component.y / scale,
+      width: component.width / scale,
+      height: component.height / scale,
+      area: component.area,
+    }))
+    .filter((component) => component.y > image.naturalHeight * 0.58)
+    .filter((component) => component.height < image.naturalHeight * 0.22)
+    .filter((component) => component.width > image.naturalWidth * 0.028);
+  const footerBoxes = mergeBoxes(footerComponents, image.naturalWidth * 0.04)
+    .map((group) => clampDetectedSheetBox({
+      x: group.x - pad,
+      y: group.y - pad,
+      width: group.width + pad * 2,
+      height: group.height + pad * 2,
+    }, image))
+    .filter((box) => box.width > 34 && box.height > 34);
+  const adjustedBoxes = boxes
+    .filter((box) => !(box.y > image.naturalHeight * 0.55 && box.height < image.naturalHeight * 0.24 && box.width > image.naturalWidth * 0.1))
+    .map((box) => {
+      if (box.height < image.naturalHeight * 0.45) return box;
+      const overlappingFooterTop = footerBoxes
+        .filter((footer) => {
+          const overlap = overlapLength(box.x, box.x + box.width, footer.x, footer.x + footer.width);
+          return overlap > Math.min(box.width, footer.width) * 0.18;
+        })
+        .map((footer) => footer.y)
+        .filter((footerTop) => footerTop > box.y + box.height * 0.55)
+        .sort((a, b) => a - b)[0];
+      if (!overlappingFooterTop) return box;
+      const adjustedHeight = overlappingFooterTop - box.y - pad;
+      if (adjustedHeight >= box.height) return box;
+      return clampDetectedSheetBox({
+        x: box.x,
+        y: box.y,
+        width: box.width,
+        height: Math.max(34, adjustedHeight),
+      }, image);
+    });
+
+  return sortBoxesReadingOrder([...adjustedBoxes, ...footerBoxes]).slice(0, 80);
+}
+
 function smartComponentSheetBoxes(mask, width, height, image, scale) {
   const minRawArea = Math.max(10, Math.round(width * height * 0.000018));
   const rawComponents = rawMaskComponents(mask, width, height, minRawArea)
@@ -2242,6 +2379,14 @@ function smartComponentSheetBoxes(mask, width, height, image, scale) {
   return refineDetectedSheetBoxes(mergeBoxes(boxes, gap), mask, width, height, image, scale).slice(0, 80);
 }
 
+function hasMeaningfulObjectInk(mask, width, height) {
+  const minRawArea = Math.max(12, Math.round(width * height * 0.00002));
+  const components = rawMaskComponents(mask, width, height, minRawArea)
+    .filter((component) => !isTextLikeSheetComponent(component, width, height));
+  const totalArea = components.reduce((sum, component) => sum + component.area, 0);
+  return components.length >= 2 && totalArea > width * height * 0.012;
+}
+
 function detectSheetBoxes(image) {
   const maxSide = 920;
   const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
@@ -2269,18 +2414,24 @@ function detectSheetBoxes(image) {
     const saturation = Math.max(red, green, blue) - Math.min(red, green, blue);
     const visible = pixels.data[pixel + 3] > 24;
     if (visible && diff > 78) mask[index] = 1;
-    if (visible && (diff > 112 || saturation > 32 || luma < backgroundLuma - 34)) shapeMask[index] = 1;
+    const darkInk = luma < Math.min(170, backgroundLuma - 48);
+    const vividInk = saturation > 70 && diff > 100 && luma < 225;
+    if (visible && (darkInk || vividInk)) shapeMask[index] = 1;
   }
   const cleanShapeMask = removeLinearSheetRules(shapeMask, width, height);
   const cleanMask = removeLinearSheetRules(mask, width, height);
+  const objectBoxes = componentObjectSheetBoxes(cleanShapeMask, width, height, image, scale);
+  if (objectBoxes.length >= 3) return objectBoxes;
   const smart = smartComponentSheetBoxes(cleanShapeMask, width, height, image, scale);
   if (smart.length >= 2) return smart;
   const broadSmart = smartComponentSheetBoxes(cleanMask, width, height, image, scale);
   if (broadSmart.length >= 2) return broadSmart;
   const projected = projectionSheetBoxes(cleanMask, width, height, image, scale);
   if (projected.length >= 2) return projected;
-  const grid = gridSheetBoxes(cleanMask, width, height, image, scale);
-  if (grid.length >= 2) return grid;
+  if (!hasMeaningfulObjectInk(cleanShapeMask, width, height)) {
+    const grid = gridSheetBoxes(cleanMask, width, height, image, scale);
+    if (grid.length >= 2) return grid;
+  }
   const dilated = dilateMask(cleanMask, width, height, 1);
   const visited = new Uint8Array(width * height);
   const components = [];

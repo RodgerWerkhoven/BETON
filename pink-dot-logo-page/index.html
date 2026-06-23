@@ -12,14 +12,14 @@
         <p class="eyebrow">ANÓTHER DIMENSION</p>
         <h1>CONTENT CURATOR</h1>
         <label>
-          <span>Naam</span>
+          <span data-i18n="loginName">Naam</span>
           <input id="loginName" name="name" autocomplete="username" required />
         </label>
         <label>
-          <span>Wachtwoord</span>
+          <span data-i18n="loginPassword">Wachtwoord</span>
           <input id="loginPassword" name="password" type="password" autocomplete="current-password" required />
         </label>
-        <button type="submit">Login</button>
+        <button type="submit" data-i18n="loginButton">Login</button>
         <p id="loginError" class="login-error" role="alert"></p>
       </form>
     </section>
@@ -33,57 +33,57 @@
         <button id="projectLogoutButton" type="button">Uitloggen</button>
       </header>
       <section class="curator-guide" aria-label="Korte handleiding voor curatoren">
-        <strong>Voor curatoren</strong>
+        <strong data-i18n="guideTitle">Voor curatoren</strong>
         <ul>
-          <li>Open een project, bekijk de assets en stem met de emoji's.</li>
-          <li>Staat er al een kleur in het vakje waarop jij wilt stemmen? Klik gewoon: jouw kleur verschijnt naast die van de ander.</li>
-          <li>Nogmaals klikken op jouw eigen stem haalt alleen jouw stem weg.</li>
-          <li>Klik op tags of kleurcirkels om de selectie te filteren.</li>
-          <li>🪚 snijdt een image bij.</li>
-          <li>✂️ knipt een sheet met meerdere beelden in losse assets om apart te beoordelen.</li>
-          <li>📸 laat je zelf een zwart kader om 1 beeld trekken; dat beeld komt als los asset naast de sheet te staan.</li>
+          <li data-i18n="guideVote">Open een project, bekijk de assets en stem met de emoji's.</li>
+          <li data-i18n="guideSharedVote">Staat er al een kleur in het vakje waarop jij wilt stemmen? Klik gewoon: jouw kleur verschijnt naast die van de ander.</li>
+          <li data-i18n="guideUndoVote">Nogmaals klikken op jouw eigen stem haalt alleen jouw stem weg.</li>
+          <li data-i18n="guideFilter">Klik op tags of kleurcirkels om de selectie te filteren.</li>
+          <li data-i18n="guideCrop">🪚 snijdt een image bij.</li>
+          <li data-i18n="guideCut">✂️ knipt een sheet met meerdere beelden in losse assets om apart te beoordelen.</li>
+          <li data-i18n="guideCapture">📸 laat je zelf een zwart kader om 1 beeld trekken; dat beeld komt als los asset naast de sheet te staan.</li>
         </ul>
       </section>
       <main class="project-main">
         <section class="project-list" id="projectList" aria-label="Projecten"></section>
         <aside class="project-tools">
-          <button id="newProjectToggle" class="new-project-toggle" type="button" aria-expanded="false">Maak project</button>
+          <button id="newProjectToggle" class="new-project-toggle" type="button" aria-expanded="false" data-i18n="makeProject">Maak project</button>
           <form id="newProjectForm" class="new-project-form" hidden>
-            <p class="eyebrow">Nieuw project</p>
+            <p class="eyebrow" data-i18n="newProject">Nieuw project</p>
             <label>
-              <span>NAAM PROJECT:</span>
-              <input id="newProjectTitle" name="title" autocomplete="off" placeholder="vul hier naam in" />
+              <span data-i18n="projectName">NAAM PROJECT:</span>
+              <input id="newProjectTitle" name="title" autocomplete="off" placeholder="vul hier naam in" data-i18n-placeholder="projectNamePlaceholder" />
             </label>
             <label>
-              <span>PASSWORD PROJECT:</span>
-              <input id="newProjectPassword" name="projectPassword" autocomplete="new-password" placeholder="maak password aan" />
+              <span data-i18n="projectPassword">PASSWORD PROJECT:</span>
+              <input id="newProjectPassword" name="projectPassword" autocomplete="new-password" placeholder="maak password aan" data-i18n-placeholder="passwordPlaceholder" />
             </label>
             <div class="new-voters">
-              <p class="eyebrow">Curatoren</p>
+              <p class="eyebrow" data-i18n="curators">Curatoren</p>
               <div class="new-voter-row">
                 <label>
-                  <span>NAAM:</span>
-                  <input class="newVoterName" name="voterName" autocomplete="off" placeholder="vul naam in" />
+                  <span data-i18n="nameLabel">NAAM:</span>
+                  <input class="newVoterName" name="voterName" autocomplete="off" placeholder="vul naam in" data-i18n-placeholder="namePlaceholder" />
                 </label>
                 <label>
-                  <span>PASSWORD:</span>
-                  <input class="newVoterPassword" name="voterPassword" autocomplete="new-password" placeholder="maak password aan" />
+                  <span data-i18n="passwordLabel">PASSWORD:</span>
+                  <input class="newVoterPassword" name="voterPassword" autocomplete="new-password" placeholder="maak password aan" data-i18n-placeholder="passwordPlaceholder" />
                 </label>
               </div>
               <div class="new-voter-row">
                 <label>
-                  <span>NAAM:</span>
-                  <input class="newVoterName" name="voterName" autocomplete="off" placeholder="vul naam in" />
+                  <span data-i18n="nameLabel">NAAM:</span>
+                  <input class="newVoterName" name="voterName" autocomplete="off" placeholder="vul naam in" data-i18n-placeholder="namePlaceholder" />
                 </label>
                 <label>
-                  <span>PASSWORD:</span>
-                  <input class="newVoterPassword" name="voterPassword" autocomplete="new-password" placeholder="maak password aan" />
+                  <span data-i18n="passwordLabel">PASSWORD:</span>
+                  <input class="newVoterPassword" name="voterPassword" autocomplete="new-password" placeholder="maak password aan" data-i18n-placeholder="passwordPlaceholder" />
                 </label>
               </div>
             </div>
             <div class="new-project-actions">
-              <button type="submit">MAAK PROJECT</button>
-              <button id="copyNewProjectLink" type="button" disabled>COPY PROJECT LINK</button>
+              <button type="submit" data-i18n="makeProjectCta">MAAK PROJECT</button>
+              <button id="copyNewProjectLink" type="button" disabled data-i18n="copyProjectLink">COPY PROJECT LINK</button>
             </div>
             <p id="newProjectError" class="login-error" role="alert"></p>
           </form>
@@ -109,23 +109,29 @@
         <div class="vote-label">VOTES</div>
       </section>
       <div class="top-actions">
-        <div class="count"><span id="count">43</span> assets</div>
+        <button id="topAddAssetButton" class="top-add-asset" type="button" data-i18n="addAsset">VOEG ASSET TOE</button>
+        <div class="count"><span id="count">43</span> <span data-i18n="assets">assets</span></div>
         <label class="sort-control">
-          <span>Volgorde</span>
+          <span data-i18n="sortLabel">Volgorde</span>
           <select id="sortSelect" aria-label="Volgorde van assets">
-            <option value="popular-desc">MEEST POPULAIR EERST</option>
-            <option value="popular-asc">MINST POPULAIR EERST</option>
-            <option value="newest-desc">NIEUWSTE EERST</option>
-            <option value="upload-asc">EERSTE UPLOAD EERST</option>
-            <option value="upload-desc">LAATSTE UPLOAD EERST</option>
-            <option value="size-asc">OP SIZE VAN KLEIN NAAR GROOT</option>
-            <option value="size-desc">OP SIZE VAN GROOT NAAR KLEIN</option>
+            <option value="popular-desc" data-i18n="sortPopularDesc">MEEST POPULAIR EERST</option>
+            <option value="popular-asc" data-i18n="sortPopularAsc">MINST POPULAIR EERST</option>
+            <option value="newest-desc" data-i18n="sortNewestDesc">NIEUWSTE EERST</option>
+            <option value="upload-asc" data-i18n="sortUploadAsc">EERSTE UPLOAD EERST</option>
+            <option value="upload-desc" data-i18n="sortUploadDesc">LAATSTE UPLOAD EERST</option>
+            <option value="size-asc" data-i18n="sortSizeAsc">OP SIZE VAN KLEIN NAAR GROOT</option>
+            <option value="size-desc" data-i18n="sortSizeDesc">OP SIZE VAN GROOT NAAR KLEIN</option>
           </select>
         </label>
-        <button class="status-filter" id="addedFilter" type="button" data-filter="TOEGEVOEGD">Toegevoegd</button>
-        <button class="status-filter" id="deletedFilter" type="button" data-filter="deleted">Verwijderd</button>
-        <button id="projectOverviewButton" type="button">Projecten</button>
-        <button id="logoutButton" type="button">Uitloggen</button>
+        <button class="status-filter" id="addedFilter" type="button" data-filter="TOEGEVOEGD" hidden>Toegevoegd</button>
+        <button class="status-filter" id="deletedFilter" type="button" data-filter="deleted" hidden>Verwijderd</button>
+        <button id="projectOverviewButton" type="button" data-i18n="projects">Projecten</button>
+        <button id="logoutButton" type="button" data-i18n="logout">Uitloggen</button>
+        <div class="language-switch" aria-label="Language">
+          <button type="button" data-lang="nl" aria-label="Nederlands">🇳🇱</button>
+          <button type="button" data-lang="en" aria-label="English">🇬🇧</button>
+          <button type="button" data-lang="ko" aria-label="한국어">🇰🇷</button>
+        </div>
       </div>
     </header>
 
@@ -178,7 +184,7 @@
       </form>
       <div class="crop-head">
         <div>
-          <p class="eyebrow">Sheet Cutter</p>
+          <p class="eyebrow" data-i18n="sheetCutter">Sheet Cutter</p>
           <h2 id="sheetTitle">Cut-up</h2>
         </div>
       </div>
@@ -198,7 +204,7 @@
       </form>
       <div class="crop-head">
         <div>
-          <p class="eyebrow">Single capture</p>
+          <p class="eyebrow" data-i18n="singleCapture">Single capture</p>
           <h2 id="captureTitle">📸</h2>
         </div>
       </div>

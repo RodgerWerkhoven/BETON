@@ -37,6 +37,7 @@ const count = document.querySelector("#count");
 const controls = document.querySelector(".controls");
 const addedFilter = document.querySelector("#addedFilter");
 const deletedFilter = document.querySelector("#deletedFilter");
+const topAddAssetButton = document.querySelector("#topAddAssetButton");
 const sortSelect = document.querySelector("#sortSelect");
 const cropDialog = document.querySelector("#cropDialog");
 const cropCanvas = document.querySelector("#cropCanvas");
@@ -63,6 +64,7 @@ const lightboxMediaStage = document.querySelector("#lightboxMediaStage");
 const lightboxImage = document.querySelector("#lightboxImage");
 const lightboxClose = document.querySelector("#lightboxClose");
 const lightboxStop = document.querySelector("#lightboxStop");
+const languageButtons = Array.from(document.querySelectorAll("[data-lang]"));
 
 const cropStoreKey = "beton-logo-crops-v2";
 const cropHistoryStoreKey = "beton-logo-crop-history-v1";
@@ -70,7 +72,214 @@ const reviewStoreKey = "beton-logo-review-state-v1";
 const addedItemsStoreKey = "beton-logo-added-items-v1";
 const textStoreKey = "beton-logo-page-text-v1";
 const sortStoreKey = "beton-logo-sort-order-v1";
+const languageStoreKey = "another-dimension-language-v1";
 const sortOptions = new Set(["popular-desc", "popular-asc", "newest-desc", "upload-asc", "upload-desc", "size-asc", "size-desc"]);
+const translations = {
+  nl: {
+    addAsset: "VOEG ASSET TOE",
+    assets: "assets",
+    sortLabel: "Volgorde",
+    sortPopularDesc: "MEEST POPULAIR EERST",
+    sortPopularAsc: "MINST POPULAIR EERST",
+    sortNewestDesc: "NIEUWSTE EERST",
+    sortUploadAsc: "EERSTE UPLOAD EERST",
+    sortUploadDesc: "LAATSTE UPLOAD EERST",
+    sortSizeAsc: "OP SIZE VAN KLEIN NAAR GROOT",
+    sortSizeDesc: "OP SIZE VAN GROOT NAAR KLEIN",
+    projects: "Projecten",
+    logout: "Uitloggen",
+    loginName: "Naam",
+    loginPassword: "Wachtwoord",
+    loginButton: "Login",
+    guideTitle: "Voor curatoren",
+    makeProject: "Maak project",
+    newProject: "Nieuw project",
+    projectName: "NAAM PROJECT:",
+    projectNamePlaceholder: "vul hier naam in",
+    projectPassword: "PASSWORD PROJECT:",
+    passwordPlaceholder: "maak password aan",
+    curators: "Curatoren",
+    nameLabel: "NAAM:",
+    namePlaceholder: "vul naam in",
+    passwordLabel: "PASSWORD:",
+    makeProjectCta: "MAAK PROJECT",
+    copyProjectLink: "COPY PROJECT LINK",
+    copyLink: "COPY LINK",
+    noProjects: "Geen projecten voor deze login.",
+    personalLinkCopied: "Persoonlijke link gekopieerd.",
+    projectLinkCopied: "Projectlink gekopieerd.",
+    projectLinkFailed: "Projectlink kopiëren mislukte.",
+    projectDeleteLabel: "Project verwijderen",
+    projectDeleteConfirm: "Project verwijderen?",
+    projectDeleteFailed: "Project kon niet worden verwijderd.",
+    projectDeleted: "Project verwijderd.",
+    curatorNeedsPassword: "Elke curator heeft naam én password nodig.",
+    projectCreateFailed: "Project kon niet worden aangemaakt.",
+    projectCreated: "Project gemaakt. Rodger staat erbij; de link staat klaar.",
+    relogin: "Log opnieuw in.",
+    loginRequired: "Log in om deze images te bekijken.",
+    loginFailed: "Naam of wachtwoord klopt niet.",
+    tags: "TAGS",
+    nameEdit: "Naam wijzigen",
+    nameSave: "Naam opslaan",
+    nameReset: "Naam resetten",
+    uploadTitle: "Nieuwe image, video, audio of sheet",
+    uploadHint: "Voeg bestand toe aan dit grid",
+    uploadCommentLabel: "Uitleg bij nieuwe upload",
+    uploadCommentPlaceholder: "typ eerst uitleg, kies daarna bestand(en)",
+    sourceAdded: "Toegevoegd:",
+    sourceOriginal: "Bron",
+    writeComment: "schrijf hier je opmerking",
+    sheetCutter: "Sheet Cutter",
+    singleCapture: "Single capture",
+    reset: "Reset",
+    boxesFound: "vakken gevonden.",
+    boxes: "vakken.",
+    guideVote: "Open een project, bekijk de assets en stem met de emoji's.",
+    guideSharedVote: "Staat er al een kleur in het vakje waarop jij wilt stemmen? Klik gewoon: jouw kleur verschijnt naast die van de ander.",
+    guideUndoVote: "Nogmaals klikken op jouw eigen stem haalt alleen jouw stem weg.",
+    guideFilter: "Klik op tags of kleurcirkels om de selectie te filteren.",
+    guideCrop: "🪚 snijdt een image bij.",
+    guideCut: "✂️ knipt een sheet met meerdere beelden in losse assets om apart te beoordelen.",
+    guideCapture: "📸 laat je zelf een zwart kader om 1 beeld trekken; dat beeld komt als los asset naast de sheet te staan.",
+  },
+  en: {
+    addAsset: "ADD ASSET",
+    assets: "assets",
+    sortLabel: "Order",
+    sortPopularDesc: "MOST POPULAR FIRST",
+    sortPopularAsc: "LEAST POPULAR FIRST",
+    sortNewestDesc: "NEWEST FIRST",
+    sortUploadAsc: "FIRST UPLOAD FIRST",
+    sortUploadDesc: "LAST UPLOAD FIRST",
+    sortSizeAsc: "SIZE SMALL TO LARGE",
+    sortSizeDesc: "SIZE LARGE TO SMALL",
+    projects: "Projects",
+    logout: "Log out",
+    loginName: "Name",
+    loginPassword: "Password",
+    loginButton: "Log in",
+    guideTitle: "For curators",
+    makeProject: "Make project",
+    newProject: "New project",
+    projectName: "PROJECT NAME:",
+    projectNamePlaceholder: "enter name",
+    projectPassword: "PROJECT PASSWORD:",
+    passwordPlaceholder: "create password",
+    curators: "Curators",
+    nameLabel: "NAME:",
+    namePlaceholder: "enter name",
+    passwordLabel: "PASSWORD:",
+    makeProjectCta: "MAKE PROJECT",
+    copyProjectLink: "COPY PROJECT LINK",
+    copyLink: "COPY LINK",
+    noProjects: "No projects for this login.",
+    personalLinkCopied: "Personal link copied.",
+    projectLinkCopied: "Project link copied.",
+    projectLinkFailed: "Could not copy project link.",
+    projectDeleteLabel: "Delete project",
+    projectDeleteConfirm: "Delete project?",
+    projectDeleteFailed: "Project could not be deleted.",
+    projectDeleted: "Project deleted.",
+    curatorNeedsPassword: "Every curator needs both a name and password.",
+    projectCreateFailed: "Project could not be created.",
+    projectCreated: "Project created. Rodger is included; the link is ready.",
+    relogin: "Log in again.",
+    loginRequired: "Log in to view these images.",
+    loginFailed: "Name or password is wrong.",
+    tags: "TAGS",
+    nameEdit: "Rename",
+    nameSave: "Save name",
+    nameReset: "Reset name",
+    uploadTitle: "New image, video, audio or sheet",
+    uploadHint: "Add file to this grid",
+    uploadCommentLabel: "Note for new upload",
+    uploadCommentPlaceholder: "write a note first, then choose file(s)",
+    sourceAdded: "Added:",
+    sourceOriginal: "Source",
+    writeComment: "write your comment here",
+    sheetCutter: "Sheet Cutter",
+    singleCapture: "Single capture",
+    reset: "Reset",
+    boxesFound: "boxes found.",
+    boxes: "boxes.",
+    guideVote: "Open a project, review the assets and vote with the emoji buttons.",
+    guideSharedVote: "Already a color in the vote box you want? Click anyway: your color appears next to the other one.",
+    guideUndoVote: "Clicking your own vote again removes only your vote.",
+    guideFilter: "Click tags or color circles to filter the selection.",
+    guideCrop: "🪚 crops an image.",
+    guideCut: "✂️ cuts a sheet with multiple images into separate assets for rating.",
+    guideCapture: "📸 lets you draw a black frame around one image; that image appears as a separate asset next to the sheet.",
+  },
+  ko: {
+    addAsset: "에셋 추가",
+    assets: "에셋",
+    sortLabel: "정렬",
+    sortPopularDesc: "인기 높은 순",
+    sortPopularAsc: "인기 낮은 순",
+    sortNewestDesc: "최신순",
+    sortUploadAsc: "먼저 업로드한 순",
+    sortUploadDesc: "나중에 업로드한 순",
+    sortSizeAsc: "작은 크기부터",
+    sortSizeDesc: "큰 크기부터",
+    projects: "프로젝트",
+    logout: "로그아웃",
+    loginName: "이름",
+    loginPassword: "비밀번호",
+    loginButton: "로그인",
+    guideTitle: "큐레이터 안내",
+    makeProject: "프로젝트 만들기",
+    newProject: "새 프로젝트",
+    projectName: "프로젝트 이름:",
+    projectNamePlaceholder: "이름 입력",
+    projectPassword: "프로젝트 비밀번호:",
+    passwordPlaceholder: "비밀번호 만들기",
+    curators: "큐레이터",
+    nameLabel: "이름:",
+    namePlaceholder: "이름 입력",
+    passwordLabel: "비밀번호:",
+    makeProjectCta: "프로젝트 만들기",
+    copyProjectLink: "프로젝트 링크 복사",
+    copyLink: "링크 복사",
+    noProjects: "이 로그인에 연결된 프로젝트가 없습니다.",
+    personalLinkCopied: "개인 링크가 복사되었습니다.",
+    projectLinkCopied: "프로젝트 링크가 복사되었습니다.",
+    projectLinkFailed: "프로젝트 링크를 복사하지 못했습니다.",
+    projectDeleteLabel: "프로젝트 삭제",
+    projectDeleteConfirm: "프로젝트를 삭제할까요?",
+    projectDeleteFailed: "프로젝트를 삭제하지 못했습니다.",
+    projectDeleted: "프로젝트가 삭제되었습니다.",
+    curatorNeedsPassword: "모든 큐레이터는 이름과 비밀번호가 모두 필요합니다.",
+    projectCreateFailed: "프로젝트를 만들지 못했습니다.",
+    projectCreated: "프로젝트가 생성되었습니다. Rodger가 포함되었고 링크가 준비되었습니다.",
+    relogin: "다시 로그인하세요.",
+    loginRequired: "이 이미지를 보려면 로그인하세요.",
+    loginFailed: "이름 또는 비밀번호가 맞지 않습니다.",
+    tags: "태그",
+    nameEdit: "이름 변경",
+    nameSave: "이름 저장",
+    nameReset: "이름 초기화",
+    uploadTitle: "새 이미지, 비디오, 오디오 또는 시트",
+    uploadHint: "이 그리드에 파일 추가",
+    uploadCommentLabel: "새 업로드 메모",
+    uploadCommentPlaceholder: "먼저 메모를 쓰고 파일을 선택하세요",
+    sourceAdded: "추가됨:",
+    sourceOriginal: "출처",
+    writeComment: "여기에 의견을 쓰세요",
+    sheetCutter: "시트 커터",
+    singleCapture: "단일 캡처",
+    reset: "초기화",
+    boxesFound: "개 박스 발견.",
+    boxes: "개 박스.",
+    guideVote: "프로젝트를 열고 에셋을 확인한 뒤 이모지 버튼으로 투표하세요.",
+    guideSharedVote: "투표하려는 칸에 이미 색이 있어도 클릭하세요. 내 색이 옆에 표시됩니다.",
+    guideUndoVote: "내 투표를 다시 클릭하면 내 투표만 삭제됩니다.",
+    guideFilter: "태그나 컬러 원을 클릭해 선택을 필터링하세요.",
+    guideCrop: "🪚 이미지를 자릅니다.",
+    guideCut: "✂️ 여러 이미지가 있는 시트를 개별 평가용 에셋으로 자릅니다.",
+    guideCapture: "📸 검은 프레임으로 한 이미지를 지정하면, 그 이미지가 시트 옆에 별도 에셋으로 생깁니다.",
+  },
+};
 const ratingOptions = ["🤩", "🙂", "🆗", "🤔", "🤮"];
 const ratingScore = { "🤩": 5, "🙂": 4, "🆗": 3, "🤔": 2, "🤮": 1 };
 const voterPalette = [
@@ -93,6 +302,8 @@ let addedItems = readJson(addedItemsStoreKey, {});
 let activeFilter = "all";
 let activeSort = localStorage.getItem(sortStoreKey) || "upload-asc";
 if (!sortOptions.has(activeSort)) activeSort = "upload-asc";
+let activeLanguage = localStorage.getItem(languageStoreKey) || "nl";
+if (!translations[activeLanguage]) activeLanguage = "nl";
 let activeLogo = null;
 let activeImage = null;
 let activeAspect = "free";
@@ -174,6 +385,45 @@ function writeJson(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+function t(key) {
+  return translations[activeLanguage]?.[key] || translations.nl[key] || key;
+}
+
+function applyTranslations() {
+  document.documentElement.lang = activeLanguage;
+  document.querySelectorAll("[data-i18n]").forEach((node) => {
+    const key = node.dataset.i18n;
+    node.textContent = t(key);
+  });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach((node) => {
+    const key = node.dataset.i18nPlaceholder;
+    node.setAttribute("placeholder", t(key));
+  });
+  toggleTextEdit.textContent = t("nameEdit");
+  saveTextEdit.textContent = t("nameSave");
+  resetTextEdit.textContent = t("nameReset");
+  projectOverviewButton.textContent = t("projects");
+  logoutButton.textContent = t("logout");
+  projectLogoutButton.textContent = t("logout");
+  if (topAddAssetButton) topAddAssetButton.textContent = t("addAsset");
+  if (sheetResetButton) sheetResetButton.textContent = t("reset");
+  if (captureResetButton) captureResetButton.textContent = t("reset");
+  if (sortSelect) sortSelect.setAttribute("aria-label", t("sortLabel"));
+  if (addFileInput) addFileInput.setAttribute("aria-label", t("addAsset"));
+  languageButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.lang === activeLanguage);
+  });
+}
+
+function setLanguage(language) {
+  if (!translations[language]) return;
+  activeLanguage = language;
+  localStorage.setItem(languageStoreKey, language);
+  applyTranslations();
+  if (!projectView.hidden) renderProjectList();
+  if (!appView.hidden) render();
+}
+
 function mergePatch(base, patch) {
   Object.entries(patch || {}).forEach(([section, values]) => {
     base[section] = base[section] || {};
@@ -228,7 +478,7 @@ async function persistNow(patch) {
     if (!response.ok) throw new Error(await response.text());
     await response.json();
   } catch (error) {
-    if (String(error.message || "").includes("401")) showLogin("Log opnieuw in.");
+    if (String(error.message || "").includes("401")) showLogin(t("relogin"));
     mergePatch(pendingPatch, toSend);
     console.error("State save failed", error);
   }
@@ -265,7 +515,7 @@ async function loadSharedState() {
     normalizeAddedItemNumbers({ persist: true });
   } catch (error) {
     if (String(error.message || "").includes("401")) {
-      showLogin("Log in om deze images te bekijken.");
+      showLogin(t("loginRequired"));
       return;
     }
     console.error("State load failed, local backup active", error);
@@ -893,7 +1143,7 @@ function renderFilters() {
   const tagButtons = allTagFilters().map((tag) => (
     `<button class="filter ${activeFilter === tag ? "active" : ""}" data-filter="${escapeHtml(tag)}">${escapeHtml(tagLabel(tag))}</button>`
   ));
-  controls.innerHTML = `<button class="filter ${activeFilter === "all" ? "active" : ""}" data-filter="all">TAGS</button>${tagButtons.join("")}`;
+  controls.innerHTML = `<button class="filter ${activeFilter === "all" ? "active" : ""}" data-filter="all">${escapeHtml(t("tags"))}</button>${tagButtons.join("")}`;
   addedFilter.classList.toggle("active", activeFilter === "TOEGEVOEGD");
   deletedFilter.classList.toggle("active", activeFilter === "deleted");
   const activeColors = allActiveVoteColors();
@@ -1030,7 +1280,7 @@ function render() {
               <span class="number">${escapeHtml(logoNumberLabel(logo))}</span>
               ${renderTags(logo, review)}
             </div>
-            <div class="source">${logo.added ? `Toegevoegd: ${safeSource}` : `Bron ${logo.sourceIndex}.${logo.dotIndex}: ${safeSource}`}</div>
+            <div class="source">${logo.added ? `${escapeHtml(t("sourceAdded"))} ${safeSource}` : `${escapeHtml(t("sourceOriginal"))} ${logo.sourceIndex}.${logo.dotIndex}: ${safeSource}`}</div>
             <div class="rating" role="group" aria-label="Rating voor image ${logo.id}">
               ${ratingOptions.map((rating) => {
                 const votes = votesFor(review);
@@ -1054,7 +1304,7 @@ function render() {
             <div class="comment-row">
               <button class="comment-toggle" type="button" data-action="comment-toggle" data-id="${logo.id}">💬</button>
               <label class="comment ${review.commentOpen || review.comment ? "is-open" : ""}">
-                <textarea data-action="comment" data-id="${logo.id}" rows="1" placeholder="${currentCommentPrefix()} schrijf hier je opmerking">${escapeHtml(commentValue(review))}</textarea>
+                <textarea data-action="comment" data-id="${logo.id}" rows="1" placeholder="${currentCommentPrefix()} ${escapeHtml(t("writeComment"))}">${escapeHtml(commentValue(review))}</textarea>
               </label>
             </div>
             <div class="card-actions">
@@ -1078,15 +1328,15 @@ function uploadCardTemplate() {
     <article class="logo-card upload-card">
       <button class="upload-drop" id="addFileButton" type="button">
         <span>⊕</span>
-        <strong>Nieuwe image, video, audio of sheet</strong>
-        <small>Voeg bestand toe aan dit grid</small>
+        <strong>${escapeHtml(t("uploadTitle"))}</strong>
+        <small>${escapeHtml(t("uploadHint"))}</small>
       </button>
       <div class="meta">
         <div class="comment-row upload-comment-row">
           <button class="comment-toggle" id="uploadCommentToggle" type="button">💬</button>
           <label class="comment" id="uploadComment">
-            <span>Uitleg bij nieuwe upload</span>
-            <textarea id="newUploadComment" rows="1" placeholder="${currentCommentPrefix()} typ eerst uitleg, kies daarna bestand(en)"></textarea>
+            <span>${escapeHtml(t("uploadCommentLabel"))}</span>
+            <textarea id="newUploadComment" rows="1" placeholder="${currentCommentPrefix()} ${escapeHtml(t("uploadCommentPlaceholder"))}"></textarea>
           </label>
         </div>
       </div>
@@ -1151,7 +1401,7 @@ function flashCopySuccess(button) {
 
 function renderProjectList() {
   if (!currentProjects.length) {
-    projectList.innerHTML = '<p class="project-empty">Geen projecten voor deze login.</p>';
+    projectList.innerHTML = `<p class="project-empty">${escapeHtml(t("noProjects"))}</p>`;
     return;
   }
   projectList.innerHTML = currentProjects.map((project) => `
@@ -1162,8 +1412,8 @@ function renderProjectList() {
       </button>
       ${project.canManage ? `
         <div class="project-actions">
-          <button class="project-copy" type="button" data-project-copy="${escapeHtml(project.id)}">COPY PROJECT LINK</button>
-          ${project.baseAssets ? "" : `<button class="project-delete" type="button" data-project-delete="${escapeHtml(project.id)}" aria-label="Project verwijderen">☠️</button>`}
+          <button class="project-copy" type="button" data-project-copy="${escapeHtml(project.id)}">${escapeHtml(t("copyProjectLink"))}</button>
+          ${project.baseAssets ? "" : `<button class="project-delete" type="button" data-project-delete="${escapeHtml(project.id)}" aria-label="${escapeHtml(t("projectDeleteLabel"))}">☠️</button>`}
         </div>
         ${projectInvitees(project).length ? `
           <div class="project-voters">
@@ -1172,7 +1422,7 @@ function renderProjectList() {
                 <span class="project-voter-color" style="background: ${escapeHtml((invitee.color || voterPalette[0]).color)}"></span>
                 <strong>${escapeHtml(firstName(invitee.name))}</strong>
                 <small>${invitee.password ? `pass: ${escapeHtml(invitee.password)}` : escapeHtml(invitee.name)}</small>
-                <button class="project-copy voter-link-copy" type="button" data-project-copy="${escapeHtml(project.id)}" data-invite-name="${escapeHtml(invitee.name)}">COPY LINK</button>
+                <button class="project-copy voter-link-copy" type="button" data-project-copy="${escapeHtml(project.id)}" data-invite-name="${escapeHtml(invitee.name)}">${escapeHtml(t("copyLink"))}</button>
               </div>
             `).join("")}
           </div>
@@ -1197,7 +1447,7 @@ async function showProjectOverview() {
     await loadProjects();
   } catch (error) {
     console.error("Project load failed", error);
-    showLogin("Log opnieuw in.");
+    showLogin(t("relogin"));
   }
 }
 
@@ -1497,7 +1747,7 @@ function resetSheetBoxes() {
   sheetPointer = null;
   sheetBoxes = detectSheetBoxes(sheetImage);
   drawSheetCutter();
-  sheetStatus.textContent = `${sheetBoxes.length} vakken gevonden.`;
+  sheetStatus.textContent = `${sheetBoxes.length} ${t("boxesFound")}`;
 }
 
 function averageCornerColor(data, width, height) {
@@ -1653,7 +1903,9 @@ function projectionSheetBoxes(mask, width, height, image, scale) {
       }, image));
     });
   });
-  return sortBoxesReadingOrder(boxes.filter((box) => box.width > 32 && box.height > 32)).slice(0, 80);
+  return sortBoxesReadingOrder(boxes
+    .filter((box) => box.width > 32 && box.height > 32)
+    .filter((box) => !isLikelySheetHeadingBox(box, image))).slice(0, 80);
 }
 
 function gridSheetBoxes(mask, width, height, image, scale) {
@@ -1691,7 +1943,9 @@ function gridSheetBoxes(mask, width, height, image, scale) {
       }, image));
     }
   }
-  return sortBoxesReadingOrder(boxes.filter((box) => box.width > 32 && box.height > 32)).slice(0, 80);
+  return sortBoxesReadingOrder(boxes
+    .filter((box) => box.width > 32 && box.height > 32)
+    .filter((box) => !isLikelySheetHeadingBox(box, image))).slice(0, 80);
 }
 
 function sortBoxesReadingOrder(boxes) {
@@ -1710,6 +1964,189 @@ function sortBoxesReadingOrder(boxes) {
   return rows
     .sort((a, b) => a.centerY - b.centerY)
     .flatMap((row) => row.boxes.sort((a, b) => a.x - b.x));
+}
+
+function rawMaskComponents(mask, width, height, minArea) {
+  const visited = new Uint8Array(width * height);
+  const components = [];
+  for (let start = 0; start < mask.length; start += 1) {
+    if (!mask[start] || visited[start]) continue;
+    const stack = [start];
+    visited[start] = 1;
+    let minX = width;
+    let minY = height;
+    let maxX = 0;
+    let maxY = 0;
+    let area = 0;
+    while (stack.length) {
+      const current = stack.pop();
+      const x = current % width;
+      const y = Math.floor(current / width);
+      area += 1;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+      const neighbors = [current - 1, current + 1, current - width, current + width];
+      neighbors.forEach((next) => {
+        if (next < 0 || next >= mask.length || visited[next] || !mask[next]) return;
+        if ((current % width === 0 && next === current - 1) || (current % width === width - 1 && next === current + 1)) return;
+        visited[next] = 1;
+        stack.push(next);
+      });
+    }
+    if (area < minArea) continue;
+    components.push({ x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1, area });
+  }
+  return components;
+}
+
+function isTextLikeSheetComponent(component, width, height) {
+  const ratio = component.width / Math.max(1, component.height);
+  const density = component.area / Math.max(1, component.width * component.height);
+  if (component.width > width * 0.42 && component.height < height * 0.13) return true;
+  if (component.width > width * 0.2 && component.height < height * 0.055) return true;
+  if (component.height < height * 0.022 && component.width > width * 0.045) return true;
+  if (ratio > 8 && component.height < height * 0.09) return true;
+  if (density < 0.018 && component.width > width * 0.08) return true;
+  return false;
+}
+
+function maskBoxBounds(mask, width, height, box) {
+  const left = Math.max(0, Math.floor(box.x));
+  const top = Math.max(0, Math.floor(box.y));
+  const right = Math.min(width - 1, Math.ceil(box.x + box.width));
+  const bottom = Math.min(height - 1, Math.ceil(box.y + box.height));
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+  let area = 0;
+  for (let y = top; y <= bottom; y += 1) {
+    for (let x = left; x <= right; x += 1) {
+      if (!mask[y * width + x]) continue;
+      area += 1;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    }
+  }
+  if (!area) return null;
+  return { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1, area };
+}
+
+function lowProjectionRuns(values, threshold, minRun, inset = 0) {
+  const runs = [];
+  let start = null;
+  values.forEach((value, index) => {
+    const usable = index >= inset && index < values.length - inset;
+    if (usable && value <= threshold && start === null) start = index;
+    if ((!usable || value > threshold || index === values.length - 1) && start !== null) {
+      const end = value > threshold || !usable ? index - 1 : index;
+      if (end - start + 1 >= minRun) runs.push({ start, end });
+      start = null;
+    }
+  });
+  return runs;
+}
+
+function splitSampleBoxByGaps(box, mask, width, height, depth = 0) {
+  if (depth > 3) return [box];
+  const left = Math.max(0, Math.floor(box.x));
+  const top = Math.max(0, Math.floor(box.y));
+  const right = Math.min(width - 1, Math.ceil(box.x + box.width));
+  const bottom = Math.min(height - 1, Math.ceil(box.y + box.height));
+  const boxWidth = right - left + 1;
+  const boxHeight = bottom - top + 1;
+  if (boxWidth < width * 0.16 && boxHeight < height * 0.18) return [box];
+
+  const columnProjection = Array.from({ length: boxWidth }, (_, offsetX) => {
+    let total = 0;
+    for (let y = top; y <= bottom; y += 1) total += mask[y * width + left + offsetX];
+    return total;
+  });
+  const rowProjection = Array.from({ length: boxHeight }, (_, offsetY) => {
+    let total = 0;
+    for (let x = left; x <= right; x += 1) total += mask[(top + offsetY) * width + x];
+    return total;
+  });
+
+  const verticalRuns = lowProjectionRuns(
+    columnProjection,
+    Math.max(1, boxHeight * 0.012),
+    Math.max(5, boxWidth * 0.025),
+    Math.max(4, boxWidth * 0.06),
+  );
+  const horizontalRuns = lowProjectionRuns(
+    rowProjection,
+    Math.max(1, boxWidth * 0.012),
+    Math.max(5, boxHeight * 0.025),
+    Math.max(4, boxHeight * 0.06),
+  );
+  const bestVertical = verticalRuns.sort((a, b) => (b.end - b.start) - (a.end - a.start))[0];
+  const bestHorizontal = horizontalRuns.sort((a, b) => (b.end - b.start) - (a.end - a.start))[0];
+  const canSplitVertical = bestVertical && bestVertical.start > boxWidth * 0.12 && bestVertical.end < boxWidth * 0.88;
+  const canSplitHorizontal = bestHorizontal && bestHorizontal.start > boxHeight * 0.16 && bestHorizontal.end < boxHeight * 0.84;
+
+  if (canSplitVertical && (!canSplitHorizontal || boxWidth >= boxHeight)) {
+    const cut = left + Math.round((bestVertical.start + bestVertical.end) / 2);
+    const parts = [
+      { x: left, y: top, width: cut - left, height: boxHeight },
+      { x: cut + 1, y: top, width: right - cut, height: boxHeight },
+    ].map((part) => maskBoxBounds(mask, width, height, part)).filter(Boolean);
+    if (parts.length > 1) return parts.flatMap((part) => splitSampleBoxByGaps(part, mask, width, height, depth + 1));
+  }
+  if (canSplitHorizontal) {
+    const cut = top + Math.round((bestHorizontal.start + bestHorizontal.end) / 2);
+    const parts = [
+      { x: left, y: top, width: boxWidth, height: cut - top },
+      { x: left, y: cut + 1, width: boxWidth, height: bottom - cut },
+    ].map((part) => maskBoxBounds(mask, width, height, part)).filter(Boolean);
+    if (parts.length > 1) return parts.flatMap((part) => splitSampleBoxByGaps(part, mask, width, height, depth + 1));
+  }
+  return [box];
+}
+
+function isLikelySheetHeadingBox(box, image) {
+  const ratio = box.width / Math.max(1, box.height);
+  if (box.width > image.naturalWidth * 0.55 && box.height < image.naturalHeight * 0.12) return true;
+  if (box.y < image.naturalHeight * 0.18 && box.width > image.naturalWidth * 0.25 && ratio > 4) return true;
+  if (box.width > image.naturalWidth * 0.18 && box.height < image.naturalHeight * 0.035) return true;
+  return false;
+}
+
+function smartComponentSheetBoxes(mask, width, height, image, scale) {
+  const minRawArea = Math.max(14, Math.round(width * height * 0.000025));
+  const rawComponents = rawMaskComponents(mask, width, height, minRawArea)
+    .filter((component) => !isTextLikeSheetComponent(component, width, height));
+  if (!rawComponents.length) return [];
+  const filteredMask = new Uint8Array(width * height);
+  rawComponents.forEach((component) => {
+    for (let y = component.y; y < component.y + component.height; y += 1) {
+      for (let x = component.x; x < component.x + component.width; x += 1) {
+        const index = y * width + x;
+        if (mask[index]) filteredMask[index] = 1;
+      }
+    }
+  });
+  const clusteredMask = dilateMask(filteredMask, width, height, 2);
+  const clustered = rawMaskComponents(clusteredMask, width, height, Math.max(80, width * height * 0.00016));
+  const pad = sheetDetectionPad(width, height);
+  const boxes = clustered
+    .flatMap((component) => splitSampleBoxByGaps(maskBoxBounds(filteredMask, width, height, component) || component, filteredMask, width, height))
+    .map((component) => clampDetectedSheetBox({
+      x: (component.x - pad) / scale,
+      y: (component.y - pad) / scale,
+      width: (component.width + pad * 2) / scale,
+      height: (component.height + pad * 2) / scale,
+    }, image))
+    .filter((box) => box.width > Math.max(30, image.naturalWidth * 0.025) && box.height > Math.max(30, image.naturalHeight * 0.035))
+    .filter((box) => !isLikelySheetHeadingBox(box, image))
+    .filter((box) => box.width < image.naturalWidth * 0.82 || box.height < image.naturalHeight * 0.5);
+  const gap = Math.max(image.naturalWidth, image.naturalHeight) * 0.0025;
+  return sortBoxesReadingOrder(mergeBoxes(boxes, gap)
+    .filter((box) => !isLikelySheetHeadingBox(box, image))).slice(0, 80);
 }
 
 function detectSheetBoxes(image) {
@@ -1732,6 +2169,8 @@ function detectSheetBoxes(image) {
       + Math.abs(pixels.data[pixel + 2] - background[2]);
     if (pixels.data[pixel + 3] > 24 && diff > 78) mask[index] = 1;
   }
+  const smart = smartComponentSheetBoxes(mask, width, height, image, scale);
+  if (smart.length >= 2) return smart;
   const projected = projectionSheetBoxes(mask, width, height, image, scale);
   const grid = gridSheetBoxes(mask, width, height, image, scale);
   if (projected.length > 3 && projected.length >= grid.length * 0.7) return projected;
@@ -1778,7 +2217,8 @@ function detectSheetBoxes(image) {
   const gap = Math.max(image.naturalWidth, image.naturalHeight) * 0.006;
   const merged = mergeBoxes(components, gap)
     .map((box) => clampDetectedSheetBox(box, image))
-    .filter((box) => box.width > 28 && box.height > 28);
+    .filter((box) => box.width > 28 && box.height > 28)
+    .filter((box) => !isLikelySheetHeadingBox(box, image));
   if (!merged.length) return [{ x: 0, y: 0, width: image.naturalWidth, height: image.naturalHeight }];
   return sortBoxesReadingOrder(merged).slice(0, 80);
 }
@@ -1961,14 +2401,14 @@ function addSheetBoxFrom(index) {
     y: source.y + (rightSpace >= offset ? 0 : Math.min(offset, Math.max(0, bottomSpace))),
   };
   sheetBoxes.splice(index + 1, 0, clampSheetBox(next));
-  sheetStatus.textContent = `${sheetBoxes.length} vakken.`;
+  sheetStatus.textContent = `${sheetBoxes.length} ${t("boxes")}`;
   drawSheetCutter();
 }
 
 function removeSheetBox(index) {
   sheetBoxes.splice(index, 1);
   sheetPointer = null;
-  sheetStatus.textContent = `${sheetBoxes.length} vakken.`;
+  sheetStatus.textContent = `${sheetBoxes.length} ${t("boxes")}`;
   drawSheetCutter();
 }
 
@@ -2010,7 +2450,7 @@ async function openSheetCutter(logo) {
   setTimeout(() => {
     resizeSheetCanvas();
     drawSheetCutter();
-    sheetStatus.textContent = `${sheetBoxes.length} vakken gevonden.`;
+    sheetStatus.textContent = `${sheetBoxes.length} ${t("boxesFound")}`;
   }, 0);
 }
 
@@ -2587,6 +3027,14 @@ controls.addEventListener("click", (event) => {
   });
 });
 
+topAddAssetButton?.addEventListener("click", () => {
+  addFileInput.click();
+});
+
+languageButtons.forEach((button) => {
+  button.addEventListener("click", () => setLanguage(button.dataset.lang));
+});
+
 voteButtons.addEventListener("click", (event) => {
   const button = event.target.closest("[data-filter]");
   if (!button) return;
@@ -2961,10 +3409,10 @@ projectList.addEventListener("click", (event) => {
     copyProjectLink(project, copyButton.dataset.inviteName || "")
       .then(() => {
         flashCopySuccess(copyButton);
-        newProjectError.textContent = copyButton.dataset.inviteName ? "Persoonlijke link gekopieerd." : "Projectlink gekopieerd.";
+        newProjectError.textContent = copyButton.dataset.inviteName ? t("personalLinkCopied") : t("projectLinkCopied");
       })
       .catch(() => {
-        newProjectError.textContent = "Projectlink kopiëren mislukte.";
+        newProjectError.textContent = t("projectLinkFailed");
       });
     return;
   }
@@ -2973,7 +3421,7 @@ projectList.addEventListener("click", (event) => {
     const projectId = deleteButton.dataset.projectDelete;
     const project = currentProjects.find((item) => item.id === projectId);
     if (!project) return;
-    if (!window.confirm(`Project "${project.title}" verwijderen?`)) return;
+    if (!window.confirm(`${t("projectDeleteConfirm")} "${project.title}"`)) return;
     deleteProject(projectId);
     return;
   }
@@ -2993,12 +3441,12 @@ async function deleteProject(projectId) {
   newProjectError.textContent = "";
   const response = await fetch(`/api/projects?id=${encodeURIComponent(projectId)}`, { method: "DELETE" });
   if (!response.ok) {
-    newProjectError.textContent = "Project kon niet worden verwijderd.";
+    newProjectError.textContent = t("projectDeleteFailed");
     return;
   }
   currentProjects = currentProjects.filter((project) => project.id !== projectId);
   renderProjectList();
-  newProjectError.textContent = "Project verwijderd.";
+  newProjectError.textContent = t("projectDeleted");
 }
 
 newProjectForm.addEventListener("submit", async (event) => {
@@ -3012,7 +3460,7 @@ newProjectForm.addEventListener("submit", async (event) => {
       password: row.querySelector(".newVoterPassword")?.value.trim() || "",
     }));
   if (invitees.some((invitee) => Boolean(invitee.name) !== Boolean(invitee.password))) {
-    newProjectError.textContent = "Elke curator heeft naam én password nodig.";
+    newProjectError.textContent = t("curatorNeedsPassword");
     copyNewProjectLink.disabled = false;
     return;
   }
@@ -3027,7 +3475,7 @@ newProjectForm.addEventListener("submit", async (event) => {
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    newProjectError.textContent = "Project kon niet worden aangemaakt.";
+    newProjectError.textContent = t("projectCreateFailed");
     return;
   }
   const data = await response.json();
@@ -3036,7 +3484,7 @@ newProjectForm.addEventListener("submit", async (event) => {
   renderProjectList();
   newProjectForm.reset();
   copyNewProjectLink.disabled = false;
-  newProjectError.textContent = "Project gemaakt. Rodger staat erbij; de link staat klaar.";
+  newProjectError.textContent = t("projectCreated");
 });
 
 copyNewProjectLink.addEventListener("click", () => {
@@ -3044,10 +3492,10 @@ copyNewProjectLink.addEventListener("click", () => {
   copyProjectLink(lastCreatedProject)
     .then(() => {
       flashCopySuccess(copyNewProjectLink);
-      newProjectError.textContent = "Projectlink gekopieerd.";
+      newProjectError.textContent = t("projectLinkCopied");
     })
     .catch(() => {
-      newProjectError.textContent = "Projectlink kopiëren mislukte.";
+      newProjectError.textContent = t("projectLinkFailed");
     });
 });
 
@@ -3075,7 +3523,7 @@ loginForm.addEventListener("submit", async (event) => {
     body: JSON.stringify({ name: loginName.value.trim(), password: loginPassword.value }),
   });
   if (!response.ok) {
-    showLogin("Naam of wachtwoord klopt niet.");
+    showLogin(t("loginFailed"));
     return;
   }
   currentSession = await response.json();
@@ -3101,6 +3549,8 @@ document.addEventListener("visibilitychange", () => {
 });
 
 window.addEventListener("focus", syncRealtimeVotes);
+
+applyTranslations();
 
 (async () => {
   const response = await fetch("/api/session", { cache: "no-store" });

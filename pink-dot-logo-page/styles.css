@@ -492,6 +492,45 @@ h1 {
   background: var(--accent);
 }
 
+.top-add-asset {
+  flex: 0 0 auto;
+  border: 1px solid var(--dark);
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 900;
+  min-height: 44px;
+  padding: 8px 12px;
+  white-space: nowrap;
+}
+
+.language-switch {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+}
+
+.language-switch button {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid var(--dark);
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 22px;
+  padding: 0;
+}
+
+.language-switch button.active {
+  background: var(--dark);
+}
+
 .top-actions {
   grid-area: actions;
   display: flex;
@@ -544,6 +583,7 @@ main {
 }
 
 .text-tools button,
+.top-add-asset,
 .status-filter,
 .crop-actions button,
 .crop-footer button,
@@ -569,7 +609,13 @@ main {
   padding: 8px 12px;
 }
 
+.top-actions .top-add-asset {
+  background: var(--accent);
+}
+
 .text-tools button:focus-visible,
+.top-add-asset:focus-visible,
+.language-switch button:focus-visible,
 .status-filter:focus-visible,
 .vote-filter:focus-visible,
 .crop-actions button:focus-visible,

@@ -155,11 +155,16 @@ function readJson(key, fallback) {
 
 function setProjectTitleFallback() {
   if (!activeProject) return;
-  const saved = readJson(textStoreKey, {});
-  if (saved.title) return;
+  const saved = readJson(currentTextStoreKey(), {});
+  const savedTitle = normalizeSavedText("title", saved.title);
+  if (savedTitle && savedTitle !== defaults.title) return;
   editableTextNodes.forEach((node) => {
     if (node.dataset.editKey === "title") node.textContent = activeProject.title;
   });
+}
+
+function currentTextStoreKey() {
+  return activeProjectId ? `${textStoreKey}:${activeProjectId}` : textStoreKey;
 }
 
 function writeJson(key, value) {
@@ -182,7 +187,7 @@ function localSnapshot() {
     cropHistory,
     review: reviewState,
     addedItems,
-    text: readJson(textStoreKey, currentTextValues()),
+    text: readJson(currentTextStoreKey(), currentTextValues()),
     voters: voterColorState,
   };
 }
@@ -203,7 +208,7 @@ function applyState(state) {
   writeJson(cropHistoryStoreKey, cropHistory);
   writeJson(reviewStoreKey, reviewState);
   writeJson(addedItemsStoreKey, addedItems);
-  writeJson(textStoreKey, state.text || {});
+  writeJson(currentTextStoreKey(), state.text || {});
   applySavedText();
 }
 
@@ -432,7 +437,7 @@ function latestCaptureForLogo(logo) {
 
 function captureButtonColor(logo) {
   if (logo.captureCreatorColor) return captureColorValue(logo.captureCreatorColor);
-  return captureColorValue(latestCaptureForLogo(logo)?.captureCreatorColor) || "";
+  return "";
 }
 
 function captureButtonStyle(logo) {
@@ -531,6 +536,15 @@ function visibleLogos() {
 }
 
 function logoUploadOrder(logo, fallbackIndex) {
+  if (logo.captureRootKey || logo.captureParentKey) {
+    const rootLogo = findLogoByStateKey(logo.captureRootKey || logo.captureParentKey);
+    const baseLabel = logo.captureNumberBase || baseSheetNumberLabel(rootLogo);
+    const baseNumber = Number(String(baseLabel || "").replace(/^#/, ""));
+    const suffix = captureLetterForLogo(logo);
+    const suffixIndex = /^[A-Z]$/.test(suffix) ? suffix.charCodeAt(0) - 64 : 1;
+    if (Number.isFinite(baseNumber)) return baseNumber + suffixIndex / 100;
+  }
+  if (isNumberedUpload(logo) && Number.isFinite(Number(logo.uploadNumber))) return Number(logo.uploadNumber);
   if (Number.isFinite(Number(logo.manualOrder))) return Number(logo.manualOrder);
   const id = String(logo.id || "");
   const timestamp = id.match(/^(?:added|sheet)-(\d+)/)?.[1];
@@ -1008,14 +1022,15 @@ function uploadCardTemplate() {
 }
 
 function normalizeSavedText(key, value) {
-  if (key === "title" && value === "Logo review") return "ANÓTHER DIMENSION CONTENT CURATOR";
-  if (key === "title" && value === "Images review") return "ANÓTHER DIMENSION CONTENT CURATOR";
-  if (key === "title" && value === "ANÓTHER DIMENSION VOTING BOOTH") return "ANÓTHER DIMENSION CONTENT CURATOR";
+  if (key === "title" && value === "Logo review") return activeProject?.title || defaults.title;
+  if (key === "title" && value === "Images review") return activeProject?.title || defaults.title;
+  if (key === "title" && value === "ANÓTHER DIMENSION VOTING BOOTH") return activeProject?.title || defaults.title;
+  if (key === "title" && value === defaults.title && activeProject?.title && activeProject.title !== defaults.title) return activeProject.title;
   return value;
 }
 
 function applySavedText() {
-  const saved = readJson(textStoreKey, {});
+  const saved = readJson(currentTextStoreKey(), {});
   editableTextNodes.forEach((node) => {
     const key = node.dataset.editKey;
     node.textContent = normalizeSavedText(key, saved[key]) || defaults[key];
@@ -2852,12 +2867,12 @@ captureDialog.addEventListener("close", () => {
 toggleTextEdit.addEventListener("click", () => setTextEditMode(true));
 saveTextEdit.addEventListener("click", () => {
   const text = currentTextValues();
-  writeJson(textStoreKey, text);
+  writeJson(currentTextStoreKey(), text);
   schedulePersist({ text });
   setTextEditMode(false);
 });
 resetTextEdit.addEventListener("click", () => {
-  localStorage.removeItem(textStoreKey);
+  localStorage.removeItem(currentTextStoreKey());
   applySavedText();
   schedulePersist({ text: Object.fromEntries(Object.keys(defaults).map((key) => [key, null])) });
   setTextEditMode(false);

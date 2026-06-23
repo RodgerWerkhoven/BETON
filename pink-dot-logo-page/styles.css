@@ -391,10 +391,10 @@ body > div {
   top: 0;
   z-index: 5;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto auto;
   grid-template-areas:
-    "title title"
-    "votes actions";
+    "title title title"
+    ". votes actions";
   align-items: end;
   gap: 12px 22px;
   padding: 18px clamp(16px, 4vw, 48px);
@@ -405,6 +405,7 @@ body > div {
 
 .title-block {
   grid-area: title;
+  justify-self: stretch;
   min-width: 0;
 }
 
@@ -496,8 +497,8 @@ h1 {
   display: flex;
   max-width: none;
   align-items: flex-end;
-  justify-content: flex-start;
-  flex-wrap: wrap;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
   gap: 8px;
 }
 
@@ -1321,10 +1322,14 @@ main {
 
 @media (max-width: 1320px) {
   .topbar {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto auto;
     grid-template-areas:
-      "title title"
-      "votes actions";
+      "title title title"
+      ". votes actions";
+  }
+
+  .top-actions {
+    flex-wrap: wrap;
   }
 }
 
@@ -1337,6 +1342,7 @@ main {
       "votes"
       "actions";
     gap: 12px;
+    justify-content: stretch;
   }
 
   .top-actions,
@@ -1389,6 +1395,7 @@ main {
   .top-actions {
     align-items: stretch;
     flex-direction: column;
+    flex-wrap: wrap;
   }
 
   .vote-filters {

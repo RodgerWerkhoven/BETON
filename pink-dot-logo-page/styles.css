@@ -204,6 +204,40 @@ body > div {
   padding: 0;
 }
 
+.project-voters {
+  display: grid;
+  gap: 8px;
+}
+
+.project-voter {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 0.7fr) minmax(0, 1.3fr) minmax(120px, auto);
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.project-voter-color {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--dark);
+  border-radius: 999px;
+}
+
+.project-voter strong,
+.project-voter small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.project-voter small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .project-tools {
   display: grid;
   justify-items: start;
@@ -247,6 +281,21 @@ body > div {
   font: inherit;
   font-size: 16px;
   padding: 8px 10px;
+}
+
+.new-voters {
+  display: grid;
+  gap: 8px;
+}
+
+.new-voters .eyebrow {
+  margin: 0;
+}
+
+.new-voter-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
 }
 
 .new-project-actions {
@@ -319,6 +368,22 @@ body > div {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.vote-chip {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+}
+
+.vote-chip span {
+  max-width: 76px;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .vote-filter {
@@ -1186,6 +1251,11 @@ main {
 
   .project-delete {
     grid-column: 2 / 3;
+  }
+
+  .project-voter,
+  .new-voter-row {
+    grid-template-columns: 1fr;
   }
 
   .project-head {

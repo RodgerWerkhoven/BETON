@@ -13,6 +13,7 @@ const newProjectToggle = document.querySelector("#newProjectToggle");
 const newProjectForm = document.querySelector("#newProjectForm");
 const newProjectTitle = document.querySelector("#newProjectTitle");
 const newProjectPassword = document.querySelector("#newProjectPassword");
+const newVoterRows = Array.from(document.querySelectorAll(".new-voter-row"));
 const copyNewProjectLink = document.querySelector("#copyNewProjectLink");
 const newProjectError = document.querySelector("#newProjectError");
 const voteButtons = document.querySelector("#voteButtons");
@@ -65,11 +66,13 @@ const voterPalette = [
   { id: "green", color: "#60d46f" },
   { id: "blue", color: "#9adfff" },
   { id: "yellow", color: "#ffd85a" },
+  { id: "purple", color: "#b89cff" },
 ];
 const rodgerVoterColor = { id: "pink", color: "#ff30d6" };
 const sheetBoxPalette = ["#ff1d1d", "#60d46f", "#ff30d6", "#2d9cff"];
 const defaults = Object.fromEntries(editableTextNodes.map((node) => [node.dataset.editKey, node.textContent]));
-let activeProjectId = new URLSearchParams(window.location.search).get("project") || "Alien";
+const initialParams = new URLSearchParams(window.location.search);
+let activeProjectId = initialParams.get("project") || "Alien";
 
 let logos = [];
 let cropOverrides = readJson(cropStoreKey, {});
@@ -106,6 +109,8 @@ function showLogin(message = "") {
   projectView.hidden = true;
   appView.hidden = true;
   loginError.textContent = message;
+  const invitedName = new URLSearchParams(window.location.search).get("name");
+  if (invitedName && !loginName.value) loginName.value = invitedName;
   loginName.focus();
 }
 
@@ -406,9 +411,36 @@ function hasLegacyBlueVotes() {
   return Object.values(reviewState).some((review) => review.ratings?.voter3);
 }
 
+function firstName(name) {
+  return String(name || "").trim().split(/\s+/)[0] || "";
+}
+
+function projectInvitees(project = activeProject) {
+  return Array.isArray(project?.invitees) ? project.invitees.filter((invitee) => invitee.name) : [];
+}
+
+function projectVoterEntries(project = activeProject) {
+  const entries = [];
+  entries.push({ name: "Rodger", firstName: "Rodger", color: rodgerVoterColor, isAdmin: true });
+  projectInvitees(project).forEach((invitee, index) => {
+    entries.push({
+      name: invitee.name,
+      firstName: firstName(invitee.name),
+      password: invitee.password || "",
+      color: invitee.color || voterPalette[index % voterPalette.length],
+    });
+  });
+  if (!projectInvitees(project).length && project?.clientName && project.clientName !== "Rodger") {
+    entries.push({ name: project.clientName, firstName: firstName(project.clientName), color: voterPalette[0] });
+  }
+  return entries;
+}
+
 function fallbackColorForVoter(voterKey) {
   if (voterKey === "Rodger") return rodgerVoterColor;
   if (voterColorState[voterKey]) return voterColorState[voterKey];
+  const projectVoter = projectVoterEntries().find((entry) => entry.name === voterKey);
+  if (projectVoter?.color) return projectVoter.color;
   if (voterKey === "__legacyBlue") return voterPalette[1];
   if (voterKey === "Alien" || voterKey === "client") return voterPalette[0];
   if (voterKey === legacyClientVoterKey() && hasLegacyClientVotes()) return voterPalette[0];
@@ -432,7 +464,7 @@ function colorForCurrentVoter() {
   if (existing || currentSession?.role === "admin") return existing || rodgerVoterColor;
   const used = usedVoterColorIds();
   const available = voterPalette.filter((item) => !used.has(item.id));
-  return available[Math.floor(Math.random() * available.length)] || voterPalette[Math.floor(Math.random() * voterPalette.length)];
+  return available[0] || voterPalette[0];
 }
 
 function ensureCurrentVoterRegistered(options = {}) {
@@ -479,16 +511,16 @@ function hasVoteColor(logo, colorId) {
 }
 
 function allActiveVoteColors() {
-  const colors = new Map();
+  const colors = new Map(projectVoterEntries().map((entry) => [entry.color.id, { ...entry.color, name: entry.firstName }]));
   Object.values(voterColorState).forEach((color) => colors.set(color.id, color));
   allLogos().forEach((logo) => {
     Object.keys(votesFor(logoReview(logo))).forEach((voterKey) => {
       const color = colorForVoter(voterKey);
-      colors.set(color.id, color);
+      if (!colors.has(color.id)) colors.set(color.id, { ...color, name: firstName(voterKey) });
     });
   });
   return [...colors.values()].sort((a, b) => {
-    const order = { green: 1, pink: 2, blue: 3, yellow: 4 };
+    const order = { pink: 1, green: 2, blue: 3, yellow: 4, purple: 5 };
     return (order[a.id] || 9) - (order[b.id] || 9);
   });
 }
@@ -560,13 +592,16 @@ function renderFilters() {
   deletedFilter.classList.toggle("active", activeFilter === "deleted");
   const activeColors = allActiveVoteColors();
   voteButtons.innerHTML = activeColors.map((color) => `
-    <button
-      class="vote-filter ${activeFilter === colorFilterValue(color.id) ? "active" : ""}"
-      type="button"
-      data-filter="${colorFilterValue(color.id)}"
-      aria-label="Stemmen in deze kleur tonen"
-      style="background: ${color.color}"
-    ></button>
+    <div class="vote-chip">
+      <button
+        class="vote-filter ${activeFilter === colorFilterValue(color.id) ? "active" : ""}"
+        type="button"
+        data-filter="${colorFilterValue(color.id)}"
+        aria-label="Stemmen van ${escapeHtml(color.name || color.id)} tonen"
+        style="background: ${color.color}"
+      ></button>
+      <span>${escapeHtml(color.name || color.id)}</span>
+    </div>
   `).join("");
 }
 
@@ -781,12 +816,14 @@ function currentTextValues() {
   return Object.fromEntries(editableTextNodes.map((node) => [node.dataset.editKey, node.textContent.trim()]));
 }
 
-function inviteUrl(project) {
-  return `${window.location.origin}${window.location.pathname}?project=${encodeURIComponent(project.id)}`;
+function inviteUrl(project, name = "") {
+  const params = new URLSearchParams({ project: project.id });
+  if (name) params.set("name", name);
+  return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
 }
 
-async function copyProjectLink(project) {
-  await navigator.clipboard.writeText(inviteUrl(project));
+async function copyProjectLink(project, name = "") {
+  await navigator.clipboard.writeText(inviteUrl(project, name));
 }
 
 function currentUserAccentColor() {
@@ -819,6 +856,18 @@ function renderProjectList() {
           <button class="project-copy" type="button" data-project-copy="${escapeHtml(project.id)}">COPY PROJECT LINK</button>
           ${project.baseAssets ? "" : `<button class="project-delete" type="button" data-project-delete="${escapeHtml(project.id)}" aria-label="Project verwijderen">☠️</button>`}
         </div>
+        ${projectInvitees(project).length ? `
+          <div class="project-voters">
+            ${projectInvitees(project).map((invitee) => `
+              <div class="project-voter">
+                <span class="project-voter-color" style="background: ${escapeHtml((invitee.color || voterPalette[0]).color)}"></span>
+                <strong>${escapeHtml(firstName(invitee.name))}</strong>
+                <small>${invitee.password ? `password: ${escapeHtml(invitee.password)}` : escapeHtml(invitee.name)}</small>
+                <button class="project-copy voter-link-copy" type="button" data-project-copy="${escapeHtml(project.id)}" data-invite-name="${escapeHtml(invitee.name)}">COPY LINK</button>
+              </div>
+            `).join("")}
+          </div>
+        ` : ""}
       ` : ""}
     </article>
   `).join("");
@@ -2264,10 +2313,10 @@ projectList.addEventListener("click", (event) => {
   if (copyButton) {
     const project = currentProjects.find((item) => item.id === copyButton.dataset.projectCopy);
     if (!project) return;
-    copyProjectLink(project)
+    copyProjectLink(project, copyButton.dataset.inviteName || "")
       .then(() => {
         flashCopySuccess(copyButton);
-        newProjectError.textContent = "Projectlink gekopieerd.";
+        newProjectError.textContent = copyButton.dataset.inviteName ? "Persoonlijke link gekopieerd." : "Projectlink gekopieerd.";
       })
       .catch(() => {
         newProjectError.textContent = "Projectlink kopiëren mislukte.";
@@ -2312,9 +2361,20 @@ newProjectForm.addEventListener("submit", async (event) => {
   newProjectError.textContent = "";
   lastCreatedProject = null;
   copyNewProjectLink.disabled = true;
+  const invitees = newVoterRows
+    .map((row) => ({
+      name: row.querySelector(".newVoterName")?.value.trim() || "",
+      password: row.querySelector(".newVoterPassword")?.value.trim() || "",
+    }));
+  if (invitees.some((invitee) => Boolean(invitee.name) !== Boolean(invitee.password))) {
+    newProjectError.textContent = "Elke curator heeft naam én password nodig.";
+    copyNewProjectLink.disabled = false;
+    return;
+  }
   const payload = {
     title: newProjectTitle.value.trim(),
     projectPassword: newProjectPassword.value,
+    invitees: invitees.filter((invitee) => invitee.name && invitee.password),
   };
   const response = await fetch("/api/projects", {
     method: "POST",

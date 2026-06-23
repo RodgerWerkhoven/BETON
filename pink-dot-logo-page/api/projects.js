@@ -2,6 +2,12 @@ const { del, list } = require("@vercel/blob");
 const { verifySession, getDirectory, saveDirectory, projectsForUser, canManageProject } = require("./auth-lib");
 
 const RODGER_NOTIFY_EMAIL = process.env.RODGER_NOTIFY_EMAIL || "rodgerwerkhoven@gmail.com";
+const VOTER_COLORS = [
+  { id: "green", color: "#60d46f" },
+  { id: "blue", color: "#9adfff" },
+  { id: "yellow", color: "#ffd85a" },
+  { id: "purple", color: "#b89cff" },
+];
 
 async function readBody(req) {
   if (req.body && typeof req.body === "object") return req.body;
@@ -22,6 +28,7 @@ function slug(value) {
 
 function publicProject(project, session) {
   const canManage = canManageProject(project, session);
+  const invitees = Array.isArray(project.invitees) ? project.invitees : [];
   return {
     id: project.id,
     title: project.title,
@@ -34,11 +41,47 @@ function publicProject(project, session) {
     voterName: project.voterName || "",
     voterEmail: project.voterEmail || "",
     voterPassword: canManage ? project.voterPassword || "" : "",
+    invitees: invitees.map((invitee) => ({
+      name: invitee.name || "",
+      password: canManage ? invitee.password || "" : "",
+      color: invitee.color || null,
+    })),
     members: project.members || [],
     createdAt: project.createdAt,
     canManage,
     baseAssets: project.baseAssets === true || project.id === "Alien",
   };
+}
+
+function normalizedInvitees(body) {
+  const raw = Array.isArray(body.invitees) ? body.invitees : [];
+  const invitees = raw
+    .map((invitee) => ({
+      name: String(invitee?.name || "").trim(),
+      password: String(invitee?.password || "").trim(),
+    }))
+    .filter((invitee) => invitee.name || invitee.password);
+  if (body.voterName || body.voterPassword) {
+    invitees.push({
+      name: String(body.voterName || "").trim(),
+      password: String(body.voterPassword || "").trim(),
+    });
+  }
+  return invitees.filter((invitee, index, list) => (
+    invitee.name && invitee.password && list.findIndex((item) => item.name === invitee.name) === index
+  )).map((invitee, index) => ({
+    ...invitee,
+    color: VOTER_COLORS[index % VOTER_COLORS.length],
+  }));
+}
+
+function hasIncompleteInvitee(body) {
+  const raw = Array.isArray(body.invitees) ? body.invitees : [];
+  return raw.some((invitee) => {
+    const name = String(invitee?.name || "").trim();
+    const password = String(invitee?.password || "").trim();
+    return Boolean(name) !== Boolean(password);
+  });
 }
 
 function appOrigin(req) {
@@ -147,6 +190,8 @@ module.exports = async function handler(req, res) {
       const voterName = String(body.voterName || "").trim();
       const voterPassword = String(body.voterPassword || "").trim();
       const voterEmail = String(body.voterEmail || "").trim();
+      if (hasIncompleteInvitee(body)) return res.status(400).json({ error: "Elke curator heeft naam en wachtwoord nodig" });
+      const invitees = normalizedInvitees(body);
       const curatorEmails = Array.isArray(body.curatorEmails)
         ? body.curatorEmails.map((email) => String(email || "").trim()).filter(Boolean)
         : [body.curatorEmailA, body.curatorEmailB].map((email) => String(email || "").trim()).filter(Boolean);
@@ -175,6 +220,14 @@ module.exports = async function handler(req, res) {
           email,
         };
       });
+      invitees.forEach((invitee) => {
+        directory.users[invitee.name] = {
+          password: invitee.password,
+          label: invitee.name,
+          role: "client",
+          color: invitee.color,
+        };
+      });
       if (voterName) {
         directory.users[voterName] = {
           password: voterPassword,
@@ -183,7 +236,7 @@ module.exports = async function handler(req, res) {
           email: voterEmail,
         };
       }
-      const members = [...new Set([clientName, ...normalizedCuratorEmails, voterName, session.client, "Rodger"].filter(Boolean))];
+      const members = [...new Set([clientName, ...normalizedCuratorEmails, ...invitees.map((invitee) => invitee.name), voterName, session.client, "Rodger"].filter(Boolean))];
       directory.projects[id] = {
         id,
         title,
@@ -195,6 +248,7 @@ module.exports = async function handler(req, res) {
         voterName,
         voterEmail,
         voterPassword,
+        invitees,
         members,
         baseAssets: false,
         createdAt: new Date().toISOString(),
@@ -218,7 +272,7 @@ module.exports = async function handler(req, res) {
       if (!canManageProject(project, session)) return res.status(403).json({ error: "Geen rechten om dit project te verwijderen" });
 
       delete directory.projects[projectId];
-      [project.clientName, project.voterName, ...(project.curatorEmails || [])].filter(Boolean).forEach((member) => {
+      [project.clientName, project.voterName, ...(project.curatorEmails || []), ...(project.invitees || []).map((invitee) => invitee.name)].filter(Boolean).forEach((member) => {
         if (member !== "Rodger" && member !== project.owner && !isMemberElsewhere(directory, projectId, member)) delete directory.users[member];
       });
       await deleteProjectBlobs(projectId);

@@ -1075,6 +1075,8 @@ main {
 
 .capture-logo {
   background: var(--capture-button-bg, var(--voter-yellow));
+  font-size: 32px;
+  line-height: 1;
 }
 
 .undo-card,
@@ -1328,6 +1330,101 @@ main {
   transform: translate3d(var(--lightbox-x, 0px), var(--lightbox-y, 0px), 0) scale(var(--lightbox-scale, 1));
   transform-origin: center center;
   will-change: transform;
+}
+
+.lightbox-nav {
+  position: fixed;
+  top: 50%;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border: 2px solid var(--dark);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 1;
+  transform: translateY(-50%);
+}
+
+.lightbox-prev {
+  left: max(12px, env(safe-area-inset-left));
+}
+
+.lightbox-next {
+  right: max(12px, env(safe-area-inset-right));
+}
+
+.lightbox-tools {
+  position: fixed;
+  right: max(10px, env(safe-area-inset-right));
+  bottom: max(10px, env(safe-area-inset-bottom));
+  left: max(10px, env(safe-area-inset-left));
+  z-index: 5;
+  display: grid;
+  grid-template-columns: minmax(120px, auto) minmax(180px, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.78);
+  color: #ffffff;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.34);
+}
+
+.lightbox-tools[hidden] {
+  display: none;
+}
+
+.lightbox-tools-meta {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  line-height: 1.05;
+}
+
+.lightbox-tools-meta strong {
+  font-size: 18px;
+}
+
+.lightbox-tools-meta span {
+  max-width: 30vw;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 12px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lightbox-comment-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 8px;
+  align-items: end;
+}
+
+.lightbox-comment-row .comment {
+  display: block;
+}
+
+.lightbox-comment-row .comment textarea {
+  max-height: 96px;
+  min-height: 44px;
+  color: var(--ink);
+}
+
+.lightbox-tool-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
 .lightbox-media-stage video {
@@ -1857,6 +1954,10 @@ main {
     font-size: 20px;
   }
 
+  .capture-logo {
+    font-size: 27px;
+  }
+
   .undo-card {
     font-size: 30px;
   }
@@ -1924,6 +2025,45 @@ main {
   .lightbox-dialog img {
     max-width: 100vw;
     max-height: 100svh;
+  }
+
+  .lightbox-nav {
+    width: 42px;
+    height: 42px;
+    border-width: 1px;
+    font-size: 22px;
+  }
+
+  .lightbox-tools {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    gap: 6px;
+    padding: 6px;
+  }
+
+  .lightbox-tools-meta {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .lightbox-tools-meta strong {
+    font-size: 14px;
+  }
+
+  .lightbox-tools-meta span {
+    max-width: none;
+    font-size: 10px;
+  }
+
+  .lightbox-comment-row {
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .lightbox-tool-actions {
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 1px;
   }
 
   .brand-mark {

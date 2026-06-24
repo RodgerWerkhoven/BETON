@@ -64,6 +64,9 @@ const lightboxMediaStage = document.querySelector("#lightboxMediaStage");
 const lightboxImage = document.querySelector("#lightboxImage");
 const lightboxClose = document.querySelector("#lightboxClose");
 const lightboxStop = document.querySelector("#lightboxStop");
+const lightboxPrev = document.querySelector("#lightboxPrev");
+const lightboxNext = document.querySelector("#lightboxNext");
+const lightboxTools = document.querySelector("#lightboxTools");
 const languageButtons = Array.from(document.querySelectorAll("[data-lang]"));
 const lightboxZoom = {
   scale: 1,
@@ -278,6 +281,7 @@ let captureBox = { x: 0, y: 0, width: 1, height: 1 };
 let captureImageRect = { x: 0, y: 0, width: 1, height: 1, scale: 1 };
 let capturePointer = null;
 let activeCaptureLogo = null;
+let activeLightboxLogo = null;
 let lastCreatedProject = null;
 let ratingRequestSerial = 0;
 const latestRatingRequest = new Map();
@@ -1147,6 +1151,22 @@ function fitCommentTextareas() {
   gallery.querySelectorAll(".comment textarea").forEach(fitTextarea);
 }
 
+function updateCommentFromControl(control) {
+  const logo = findLogo(control.dataset.id);
+  if (!logo) return null;
+  const review = logoReview(logo);
+  if (!review.comment && control.value.trim()) {
+    const prefix = currentCommentPrefix();
+    if (!/^[RAB]:\s/.test(control.value)) control.value = `${prefix} ${control.value}`;
+  }
+  review.comment = control.value;
+  const key = logoStateKey(logo);
+  reviewState[key] = review;
+  fitTextarea(control);
+  saveReviewItem(key);
+  return { logo, review, key };
+}
+
 function saveReview() {
   writeJson(reviewStoreKey, reviewState);
 }
@@ -1442,6 +1462,7 @@ async function openProject(projectId) {
 
 function openLightbox(logo) {
   if (!logo || (!isImageLogo(logo) && !isPlayableMedia(logo))) return;
+  activeLightboxLogo = logo;
   stopMedia(lightboxDialog);
   resetLightboxZoom();
   lightboxMediaStage.innerHTML = "";
@@ -1467,7 +1488,64 @@ function openLightbox(logo) {
     `;
     lightboxStop.hidden = false;
   }
+  renderLightboxChrome(logo);
   lightboxDialog.showModal();
+}
+
+function lightboxNavigableLogos() {
+  return sortedVisibleLogos().filter((logo) => isImageLogo(logo) && !logo.uploading && !logo.uploadError);
+}
+
+function lightboxLogoIndex(logo) {
+  const key = logoStateKey(logo);
+  return lightboxNavigableLogos().findIndex((item) => logoStateKey(item) === key);
+}
+
+function navigateLightbox(direction) {
+  const items = lightboxNavigableLogos();
+  if (!activeLightboxLogo || items.length < 2) return;
+  const index = lightboxLogoIndex(activeLightboxLogo);
+  const safeIndex = index >= 0 ? index : 0;
+  const next = items[(safeIndex + direction + items.length) % items.length];
+  if (next) openLightbox(next);
+}
+
+function renderLightboxChrome(logo) {
+  const items = lightboxNavigableLogos();
+  const canNavigate = isImageLogo(logo) && items.length > 1;
+  lightboxPrev.hidden = !canNavigate;
+  lightboxNext.hidden = !canNavigate;
+  renderLightboxTools(logo);
+}
+
+function renderLightboxTools(logo) {
+  if (!logo || !lightboxTools) return;
+  const review = logoReview(logo);
+  const key = logoStateKey(logo);
+  const croppable = isImageLogo(logo) && !logo.uploading && !logo.uploadError;
+  const undoDisabled = cropHistory[key]?.length ? "" : "disabled";
+  lightboxTools.hidden = false;
+  lightboxTools.innerHTML = `
+    <div class="lightbox-tools-meta">
+      <strong>${escapeHtml(logoNumberLabel(logo))}</strong>
+      <span>${escapeHtml(imageCopy(logo.name || logo.source || logo.file || ""))}</span>
+    </div>
+    <div class="lightbox-comment-row">
+      <button class="comment-toggle" type="button" data-action="comment-toggle" data-id="${logo.id}">💬</button>
+      <label class="comment ${review.commentOpen || review.comment ? "is-open" : ""}">
+        <textarea data-action="comment" data-id="${logo.id}" rows="1" placeholder="${currentCommentPrefix()} ${escapeHtml(t("writeComment"))}">${escapeHtml(commentValue(review))}</textarea>
+      </label>
+    </div>
+    <div class="lightbox-tool-actions">
+      ${croppable ? `<button class="edit-logo" type="button" data-action="crop" data-id="${logo.id}" aria-label="Bijsnijden">🪚</button>` : ""}
+      ${croppable ? `<button class="capture-logo" type="button" data-action="capture" data-id="${logo.id}" aria-label="Single capture" ${captureButtonStyle(logo)}>📸</button>` : ""}
+      ${croppable && logo.added ? `<button class="sheet-logo" type="button" data-action="sheet-cut" data-id="${logo.id}" aria-label="Sheet cut-up">✂️</button>` : ""}
+      ${croppable ? `<button class="undo-card" type="button" data-action="undo" data-id="${logo.id}" ${undoDisabled}>↩️</button>` : ""}
+      <button class="delete-logo ${review.deleted ? "is-restore" : ""}" type="button" data-action="delete" data-id="${logo.id}">${review.deleted ? "Herstel" : "☠️"}</button>
+    </div>
+  `;
+  const textarea = lightboxTools.querySelector("textarea");
+  if (textarea) fitTextarea(textarea);
 }
 
 function applyLightboxZoom() {
@@ -1565,6 +1643,9 @@ function closeLightbox() {
   lightboxMediaStage.innerHTML = "";
   lightboxMediaStage.hidden = true;
   lightboxImage.removeAttribute("src");
+  lightboxTools.hidden = true;
+  lightboxTools.innerHTML = "";
+  activeLightboxLogo = null;
   resetLightboxZoom();
   if (lightboxDialog.open) lightboxDialog.close();
 }
@@ -3142,7 +3223,7 @@ async function saveCaptureAsset() {
   normalizeAddedItemNumbers({ persist: true });
   resetCaptureTool(true);
   activeFilter = "all";
-  activeSort = "upload-asc";
+  activeSort = "newest-desc";
   localStorage.setItem(sortStoreKey, activeSort);
   render();
 }
@@ -3559,6 +3640,76 @@ lightboxImage.addEventListener("error", imageFallbackHandler);
 lightboxDialog.addEventListener("click", (event) => {
   if (event.target === lightboxDialog) closeLightbox();
 });
+lightboxPrev.addEventListener("click", () => navigateLightbox(-1));
+lightboxNext.addEventListener("click", () => navigateLightbox(1));
+lightboxTools.addEventListener("click", async (event) => {
+  const action = event.target.closest("[data-action]");
+  if (!action) return;
+  const logo = findLogo(action.dataset.id);
+  if (!logo) return;
+  const review = logoReview(logo);
+  const key = logoStateKey(logo);
+  if (action.dataset.action === "comment-toggle") {
+    review.commentOpen = !review.commentOpen;
+    if (review.commentOpen && !review.comment) review.comment = `${currentCommentPrefix()} `;
+    reviewState[key] = review;
+    saveReviewItem(key);
+    render();
+    renderLightboxTools(logo);
+    if (review.commentOpen) {
+      const textarea = lightboxTools.querySelector(`textarea[data-id="${CSS.escape(String(logo.id))}"]`);
+      if (textarea) {
+        fitTextarea(textarea);
+        textarea.focus();
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+      }
+    }
+    return;
+  }
+  if (action.dataset.action === "crop") {
+    closeLightbox();
+    openCropper(logo);
+    return;
+  }
+  if (action.dataset.action === "capture") {
+    closeLightbox();
+    openCaptureTool(logo);
+    return;
+  }
+  if (action.dataset.action === "sheet-cut") {
+    closeLightbox();
+    openSheetCutter(logo);
+    return;
+  }
+  if (action.dataset.action === "undo" && undoLogoCrop(logo)) {
+    render();
+    openLightbox(findLogo(action.dataset.id) || logo);
+    return;
+  }
+  if (action.dataset.action === "delete") {
+    if (logo.added) {
+      if (!window.confirm(`Asset "${logo.name || logo.source || logo.id}" definitief verwijderen?`)) return;
+      try {
+        await deleteAddedAsset(logo, key);
+        closeLightbox();
+      } catch (error) {
+        console.error("Asset delete failed", error);
+        window.alert("Asset kon niet volledig worden verwijderd.");
+      }
+      return;
+    }
+    review.deleted = !review.deleted;
+    reviewState[key] = review;
+    saveReviewItem(key);
+    render();
+    renderLightboxChrome(logo);
+  }
+});
+lightboxTools.addEventListener("input", (event) => {
+  const control = event.target.closest('[data-action="comment"]');
+  if (!control) return;
+  updateCommentFromControl(control);
+});
 lightboxImage.addEventListener("pointerdown", (event) => {
   if (lightboxImage.hidden) return;
   lightboxImage.setPointerCapture(event.pointerId);
@@ -3593,23 +3744,15 @@ lightboxClose.addEventListener("click", closeLightbox);
 lightboxStop.addEventListener("click", () => stopMedia(lightboxDialog));
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape") closeLightbox();
+  if (!lightboxDialog.open) return;
+  if (event.key === "ArrowLeft") navigateLightbox(-1);
+  if (event.key === "ArrowRight") navigateLightbox(1);
 });
 
 gallery.addEventListener("input", (event) => {
   const control = event.target.closest('[data-action="comment"]');
   if (!control) return;
-  const logo = findLogo(control.dataset.id);
-  if (!logo) return;
-  const review = logoReview(logo);
-  if (!review.comment && control.value.trim()) {
-    const prefix = currentCommentPrefix();
-    if (!/^[RA]:\s/.test(control.value)) control.value = `${prefix} ${control.value}`;
-  }
-  review.comment = control.value;
-  const key = logoStateKey(logo);
-  reviewState[key] = review;
-  fitTextarea(control);
-  saveReviewItem(key);
+  updateCommentFromControl(control);
 });
 
 gallery.addEventListener("click", (event) => {

@@ -1197,10 +1197,19 @@ function removeLocalAddedAsset(key) {
   delete reviewState[key];
   delete cropOverrides[key];
   delete cropHistory[key];
-  saveAddedItems();
-  saveReview();
-  writeJson(cropStoreKey, cropOverrides);
-  writeJson(cropHistoryStoreKey, cropHistory);
+  // Persisting to localStorage is best-effort: on boards with many inline
+  // base64 assets the store can exceed the quota and setItem throws
+  // QuotaExceededError. The in-memory removal above has already happened and
+  // the server is the source of truth, so a failed persist must not propagate
+  // and surface a "could not be deleted" alert for an asset that is gone.
+  try {
+    saveAddedItems();
+    saveReview();
+    writeJson(cropStoreKey, cropOverrides);
+    writeJson(cropHistoryStoreKey, cropHistory);
+  } catch (error) {
+    console.warn("Local asset state persist failed; continuing:", error);
+  }
 }
 
 async function deleteAddedAsset(logo, key) {

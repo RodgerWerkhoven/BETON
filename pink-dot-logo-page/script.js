@@ -158,6 +158,10 @@ const translations = {
     guideCrop: "🪚 snijdt een image bij.",
     guideCut: "✂️ knipt een sheet met meerdere beelden in losse assets om apart te beoordelen.",
     guideCapture: "📸 laat je zelf een zwart kader om 1 beeld trekken; dat beeld komt als los asset naast de sheet te staan.",
+    selected: "geselecteerd",
+    batchAddTag: "🏷️ + Tag",
+    batchRemoveTag: "🏷️ - Tag",
+    guideMultiSelect: "Desktop: CMD + klik om meerdere assets te selecteren. Mobiel: Ingedrukt houden om selectie-modus te starten. Batch acties: tag toevoegen (#tag typen), tag verwijderen of verwijderen (☠️).",
   },
   en: {
     addAsset: "ADD ASSET",
@@ -226,6 +230,10 @@ const translations = {
     guideCrop: "🪚 crops an image.",
     guideCut: "✂️ cuts a sheet with multiple images into separate assets for rating.",
     guideCapture: "📸 lets you draw a black frame around one image; that image appears as a separate asset next to the sheet.",
+    selected: "selected",
+    batchAddTag: "🏷️ + Tag",
+    batchRemoveTag: "🏷️ - Tag",
+    guideMultiSelect: "Desktop: CMD + click to select multiple assets. Mobile: Press and hold to enter select mode. Batch actions: add tag (type #tag), remove tag, or delete (☠️).",
   },
 };
 const ratingOptions = ["🤩", "🙂", "🆗", "🤔", "🤮"];
@@ -688,7 +696,10 @@ function logoNumberLabel(logo) {
   const rootKey = logo.captureRootKey || logo.captureParentKey;
   if (rootKey) {
     const rootLogo = findLogoByStateKey(rootKey);
-    return `${logo.captureNumberBase || baseSheetNumberLabel(rootLogo)}${captureLetterForLogo(logo)}`;
+    const base = logo.captureNumberBase || baseSheetNumberLabel(rootLogo);
+    const suffix = captureLetterForLogo(logo);
+    const separator = (logo.sourceIndex === "✂" || logo.sourceIndex === "✂️") ? "✂️" : "📸";
+    return `${base}${separator}${suffix}`;
   }
   return baseSheetNumberLabel(logo);
 }
@@ -729,8 +740,21 @@ function creatorMetadataForCurrentVoter(prefix = "asset") {
 }
 
 function captureButtonStyle(logo) {
-  const color = captureButtonColor(logo) || "var(--voter-yellow)";
-  return `style="--capture-button-bg: ${escapeHtml(color)}"`;
+  const isCapture = logo.captureCreatorColor || logo.sourceIndex === "📸";
+  const color = isCapture ? (captureColorValue(logo.captureCreatorColor) || captureColorValue(logo.assetCreatorColor)) : "";
+  return color ? `style="background: ${escapeHtml(color)}; color: var(--ink); border-color: var(--dark);"` : "";
+}
+
+function sheetButtonStyle(logo) {
+  const isSheet = logo.sheetCreatorColor || logo.sourceIndex === "✂" || logo.sourceIndex === "✂️";
+  const color = isSheet ? (captureColorValue(logo.sheetCreatorColor) || captureColorValue(logo.assetCreatorColor)) : "";
+  return color ? `style="background: ${escapeHtml(color)}; color: var(--ink); border-color: var(--dark);"` : "";
+}
+
+function editButtonStyle(logo) {
+  const review = logoReview(logo);
+  const color = review.cropCreatorColor?.color || review.cropCreatorColor || "";
+  return color ? `style="background: ${escapeHtml(color)}; color: var(--ink); border-color: var(--dark);"` : "";
 }
 
 function isImageLogo(logo) {
@@ -1023,12 +1047,25 @@ function hasVoteColor(logo, colorId) {
 }
 
 function allActiveVoteColors() {
-  const colors = new Map(projectVoterEntries().map((entry) => [entry.color.id, { ...entry.color, name: entry.firstName }]));
-  Object.values(voterColorState).forEach((color) => colors.set(color.id, color));
+  const colors = new Map();
+  projectVoterEntries().forEach((entry) => {
+    colors.set(entry.color.id, { ...entry.color, name: entry.firstName });
+  });
+  Object.entries(voterColorState).forEach(([voterKey, color]) => {
+    const existing = colors.get(color.id);
+    colors.set(color.id, {
+      ...color,
+      name: existing?.name || firstName(voterKey)
+    });
+  });
   allLogos().forEach((logo) => {
     Object.keys(votesFor(logoReview(logo))).forEach((voterKey) => {
       const color = colorForVoter(voterKey);
-      if (!colors.has(color.id)) colors.set(color.id, { ...color, name: firstName(voterKey) });
+      const existing = colors.get(color.id);
+      colors.set(color.id, {
+        ...color,
+        name: existing?.name || firstName(voterKey)
+      });
     });
   });
   return [...colors.values()].sort((a, b) => {
@@ -1116,18 +1153,26 @@ function renderFilters() {
   addedFilter.classList.toggle("active", activeFilter === "TOEGEVOEGD");
   deletedFilter.classList.toggle("active", activeFilter === "deleted");
   const activeColors = allActiveVoteColors();
-  voteButtons.innerHTML = activeColors.map((color) => `
-    <div class="vote-chip">
-      <button
-        class="vote-filter ${activeFilter === colorFilterValue(color.id) ? "active" : ""}"
-        type="button"
-        data-filter="${colorFilterValue(color.id)}"
-        aria-label="Stemmen van ${escapeHtml(color.name || color.id)} tonen"
-        style="background: ${color.color}"
-      ></button>
-      <span>${escapeHtml(color.name || color.id)}</span>
-    </div>
-  `).join("");
+  voteButtons.innerHTML = activeColors.map((color) => {
+    let displayName = "";
+    if (color.id === "pink") {
+      displayName = "RODGER";
+    } else {
+      displayName = firstName(color.name || color.id).toUpperCase();
+    }
+    return `
+      <div class="vote-chip">
+        <button
+          class="vote-filter ${activeFilter === colorFilterValue(color.id) ? "active" : ""}"
+          type="button"
+          data-filter="${colorFilterValue(color.id)}"
+          aria-label="Stemmen van ${escapeHtml(displayName)} tonen"
+          style="background: ${color.color}"
+        ></button>
+        <span>${escapeHtml(displayName)}</span>
+      </div>
+    `;
+  }).join("");
 }
 
 function currentCommentPrefix() {
@@ -1221,6 +1266,10 @@ async function deleteAddedAsset(logo, key) {
   await persistQueue.catch(() => {});
   const response = await fetch(`/api/state?project=${encodeURIComponent(activeProjectId)}&asset=${encodeURIComponent(key)}`, {
     method: "DELETE",
+    headers: {
+      "x-project-id": activeProjectId,
+      "x-asset-id": key
+    }
   });
   if (!response.ok) throw new Error(await response.text());
   removeLocalAddedAsset(key);
@@ -1238,9 +1287,17 @@ function undoLogoCrop(logo) {
   const history = cropHistory[key] || [];
   if (!history.length) return false;
   const previous = history.pop();
-  if (previous) cropOverrides[key] = previous;
-  else delete cropOverrides[key];
-      saveCropState(key);
+  if (previous) {
+    cropOverrides[key] = previous;
+  } else {
+    delete cropOverrides[key];
+    const review = reviewState[key];
+    if (review) {
+      delete review.cropCreatorColor;
+      saveReviewItem(key);
+    }
+  }
+  saveCropState(key);
   return true;
 }
 
@@ -1262,8 +1319,9 @@ function render() {
         const safeSource = escapeHtml(imageCopy(logo.source));
         const safeName = escapeHtml(logo.name || `Image ${logo.id}`);
         const croppable = isImageLogo(logo) && !logo.uploading && !logo.uploadError;
+        const isSelected = selectedAssetIds.has(String(logo.id));
         return `
-        <article class="logo-card ${review.deleted ? "is-deleted" : ""}">
+        <article class="logo-card ${review.deleted ? "is-deleted" : ""} ${isSelected ? "selected" : ""}" data-id="${logo.id}">
           ${croppable
             ? `<button class="image-button" type="button" data-id="${logo.id}">
                 <img src="${imageSource(logo)}" data-fallback="${imageFallbackSource(logo)}" alt="${safeName}, ${logo.group}" loading="lazy" />
@@ -1302,9 +1360,9 @@ function render() {
               </label>
             </div>
             <div class="card-actions">
-              ${croppable ? `<button class="edit-logo" type="button" data-id="${logo.id}" aria-label="Bijsnijden">🪚</button>` : ""}
+              ${croppable ? `<button class="edit-logo" type="button" data-id="${logo.id}" aria-label="Bijsnijden" ${editButtonStyle(logo)}>🪚</button>` : ""}
               ${croppable ? `<button class="capture-logo" type="button" data-action="capture" data-id="${logo.id}" aria-label="Single capture" ${captureButtonStyle(logo)}>📸</button>` : ""}
-              ${croppable && logo.added ? `<button class="sheet-logo" type="button" data-action="sheet-cut" data-id="${logo.id}" aria-label="Sheet cut-up">✂️</button>` : ""}
+              ${croppable && logo.added ? `<button class="sheet-logo" type="button" data-action="sheet-cut" data-id="${logo.id}" aria-label="Sheet cut-up" ${sheetButtonStyle(logo)}>✂️</button>` : ""}
               <button class="undo-card" type="button" data-action="undo" data-id="${logo.id}" ${cropHistory[logoStateKey(logo)]?.length ? "" : "disabled"}>↩️</button>
               <button class="delete-logo ${review.deleted ? "is-restore" : ""}" type="button" data-action="delete" data-id="${logo.id}">${review.deleted ? "Herstel" : "☠️"}</button>
             </div>
@@ -1546,9 +1604,9 @@ function renderLightboxTools(logo) {
       </label>
     </div>
     <div class="lightbox-tool-actions">
-      ${croppable ? `<button class="edit-logo" type="button" data-action="crop" data-id="${logo.id}" aria-label="Bijsnijden">🪚</button>` : ""}
+      ${croppable ? `<button class="edit-logo" type="button" data-action="crop" data-id="${logo.id}" aria-label="Bijsnijden" ${editButtonStyle(logo)}>🪚</button>` : ""}
       ${croppable ? `<button class="capture-logo" type="button" data-action="capture" data-id="${logo.id}" aria-label="Single capture" ${captureButtonStyle(logo)}>📸</button>` : ""}
-      ${croppable && logo.added ? `<button class="sheet-logo" type="button" data-action="sheet-cut" data-id="${logo.id}" aria-label="Sheet cut-up">✂️</button>` : ""}
+      ${croppable && logo.added ? `<button class="sheet-logo" type="button" data-action="sheet-cut" data-id="${logo.id}" aria-label="Sheet cut-up" ${sheetButtonStyle(logo)}>✂️</button>` : ""}
       ${croppable ? `<button class="undo-card" type="button" data-action="undo" data-id="${logo.id}" ${undoDisabled}>↩️</button>` : ""}
       <button class="delete-logo ${review.deleted ? "is-restore" : ""}" type="button" data-action="delete" data-id="${logo.id}">${review.deleted ? "Herstel" : "☠️"}</button>
     </div>
@@ -2928,20 +2986,31 @@ async function cutSheetIntoProject() {
   const reviewPatch = {};
   const sheetNameTags = tagsFromFileName(sheetImageName);
   const { creator, metadata } = creatorMetadataForCurrentVoter("sheet");
+  const rootKey = captureRootKey(activeSheetLogo);
+  const rootLogo = findLogoByStateKey(rootKey) || activeSheetLogo;
+  const parentOrder = logoUploadOrder(rootLogo, allLogos().findIndex((logo) => logoStateKey(logo) === logoStateKey(rootLogo)));
+  const captureNumberBase = activeSheetLogo.captureNumberBase || baseSheetNumberLabel(rootLogo);
+
   sortBoxesReadingOrder(sheetBoxes)
     .forEach((box, index) => {
       const id = `sheet-${stamp}-${index + 1}-${Math.random().toString(36).slice(2, 7)}`;
+      const suffix = String.fromCharCode(65 + index);
       const item = {
         id,
         file: id,
         name: `${sheetImageName} #${index + 1}`,
         source: sheetImageName,
-        sourceIndex: "✂",
+        sourceIndex: "✂️",
         dotIndex: String(index + 1),
         group: "TOEGEVOEGD",
         added: true,
         type: "image/jpeg",
         dataUrl: makeSheetCutDataUrl(clampSheetBox(box)),
+        captureRootKey: rootKey,
+        captureParentKey: logoStateKey(activeSheetLogo),
+        captureNumberBase,
+        captureSuffix: suffix,
+        manualOrder: parentOrder + (index + 1) / 100,
         ...metadata,
       };
       addedPatch[id] = item;
@@ -2963,6 +3032,10 @@ async function cutSheetIntoProject() {
   normalizeAddedItemNumbers({ persist: true });
   resetSheetCutter(true);
   activeFilter = "all";
+  
+  activeSort = "newest-desc";
+  localStorage.setItem(sortStoreKey, activeSort);
+
   render();
 }
 
@@ -3503,6 +3576,18 @@ sortSelect.addEventListener("change", () => {
 });
 
 gallery.addEventListener("click", async (event) => {
+  const logoCard = event.target.closest(".logo-card[data-id]");
+  if (logoCard) {
+    const isCmdClick = event.metaKey || event.ctrlKey;
+    const inMultiSelect = selectedAssetIds.size > 0;
+    if (isCmdClick || inMultiSelect) {
+      toggleAssetSelection(logoCard.dataset.id);
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+  }
+
   if (event.target.closest("#addFileButton")) {
     addFileInput.click();
     return;
@@ -3888,6 +3973,13 @@ saveCrop.addEventListener("click", () => {
   pushCropHistory(key);
   cropOverrides[key] = makeCroppedDataUrl();
   saveCropState(key);
+  
+  const voterColor = ensureCurrentVoterRegistered({ persist: false }).color || colorForCurrentVoter();
+  const review = reviewState[key] || {};
+  review.cropCreatorColor = voterColor;
+  reviewState[key] = review;
+  saveReviewItem(key);
+  
   cropDialog.close();
   render();
 });
@@ -4095,6 +4187,249 @@ document.addEventListener("visibilitychange", () => {
 });
 
 window.addEventListener("focus", syncRealtimeVotes);
+
+// Multi-select features
+const selectedAssetIds = new Set();
+let longPressTimeout = null;
+let longPressActive = false;
+let touchStartX = 0;
+let touchStartY = 0;
+
+function toggleAssetSelection(logoId) {
+  if (selectedAssetIds.has(logoId)) {
+    selectedAssetIds.delete(logoId);
+  } else {
+    selectedAssetIds.add(logoId);
+  }
+  updateSelectedCardsUI();
+  updateBatchBarUI();
+}
+
+function updateSelectedCardsUI() {
+  document.querySelectorAll(".logo-card").forEach((card) => {
+    const id = card.dataset.id;
+    if (id && selectedAssetIds.has(id)) {
+      card.classList.add("selected");
+    } else {
+      card.classList.remove("selected");
+    }
+  });
+}
+
+function updateBatchBarUI() {
+  const bar = document.getElementById("batchActionBar");
+  const countSpan = document.getElementById("batchCount");
+  if (!bar || !countSpan) return;
+  if (selectedAssetIds.size > 0) {
+    countSpan.textContent = selectedAssetIds.size;
+    bar.hidden = false;
+  } else {
+    bar.hidden = true;
+  }
+}
+
+function clearSelection() {
+  selectedAssetIds.clear();
+  updateSelectedCardsUI();
+  updateBatchBarUI();
+}
+
+function startLongPressTimer(event, logoId) {
+  if (event.pointerType !== "touch") return;
+  clearLongPressTimer();
+  longPressActive = false;
+  touchStartX = event.clientX;
+  touchStartY = event.clientY;
+  
+  longPressTimeout = setTimeout(() => {
+    longPressActive = true;
+    toggleAssetSelection(logoId);
+    if (navigator.vibrate) navigator.vibrate(50);
+  }, 600);
+}
+
+function clearLongPressTimer() {
+  if (longPressTimeout) {
+    clearTimeout(longPressTimeout);
+    longPressTimeout = null;
+  }
+}
+
+function handlePointerMove(event) {
+  if (!longPressTimeout) return;
+  const dx = event.clientX - touchStartX;
+  const dy = event.clientY - touchStartY;
+  if (Math.hypot(dx, dy) > 10) {
+    clearLongPressTimer();
+  }
+}
+
+// Batch Actions
+async function batchAddTag() {
+  if (selectedAssetIds.size === 0) return;
+  const promptText = activeLanguage === "nl" 
+    ? `Nieuwe tag toevoegen aan ${selectedAssetIds.size} geselecteerde assets:` 
+    : `Add new tag to ${selectedAssetIds.size} selected assets:`;
+  const tagInput = window.prompt(promptText);
+  if (tagInput === null) return;
+  const tagToAdd = normalizeTag(tagInput);
+  if (!tagToAdd) return;
+
+  const reviewPatch = {};
+  for (const id of selectedAssetIds) {
+    const logo = findLogo(id);
+    if (!logo) continue;
+    const key = logoStateKey(logo);
+    const review = reviewState[key] || {};
+    const existingTags = visibleTagsFor(logo, review);
+    if (!existingTags.includes(tagToAdd)) {
+      const nextTags = uniqueTags([...existingTags, tagToAdd]);
+      review.customTags = nextTags;
+      reviewState[key] = review;
+      reviewPatch[key] = review;
+    }
+  }
+
+  if (Object.keys(reviewPatch).length > 0) {
+    writeJson(reviewStoreKey, reviewState);
+    await queuePersist({ review: reviewPatch });
+    render();
+  }
+  clearSelection();
+}
+
+async function batchRemoveTag() {
+  if (selectedAssetIds.size === 0) return;
+  const promptText = activeLanguage === "nl" 
+    ? `Tag verwijderen van ${selectedAssetIds.size} geselecteerde assets:` 
+    : `Remove tag from ${selectedAssetIds.size} selected assets:`;
+  const tagInput = window.prompt(promptText);
+  if (tagInput === null) return;
+  const tagToRemove = normalizeTag(tagInput);
+  if (!tagToRemove) return;
+
+  const reviewPatch = {};
+  for (const id of selectedAssetIds) {
+    const logo = findLogo(id);
+    if (!logo) continue;
+    const key = logoStateKey(logo);
+    const review = reviewState[key] || {};
+    const existingTags = visibleTagsFor(logo, review);
+    if (existingTags.includes(tagToRemove)) {
+      const nextTags = existingTags.filter(t => t !== tagToRemove);
+      if (nextTags.length > 0) {
+        review.customTags = nextTags;
+      } else {
+        delete review.customTags;
+      }
+      reviewState[key] = review;
+      reviewPatch[key] = reviewState[key] || null;
+    }
+  }
+
+  if (Object.keys(reviewPatch).length > 0) {
+    writeJson(reviewStoreKey, reviewState);
+    await queuePersist({ review: reviewPatch });
+    render();
+  }
+  clearSelection();
+}
+
+async function batchDeleteAssets() {
+  if (selectedAssetIds.size === 0) return;
+  const confirmMessage = activeLanguage === "nl"
+    ? `Weet je zeker dat je de ${selectedAssetIds.size} geselecteerde assets wilt verwijderen?`
+    : `Are you sure you want to delete the ${selectedAssetIds.size} selected assets?`;
+  if (!window.confirm(confirmMessage)) return;
+
+  const idsToDelete = [...selectedAssetIds];
+  clearSelection();
+
+  const addedIds = [];
+  const defaultKeys = [];
+  
+  idsToDelete.forEach((id) => {
+    const logo = findLogo(id);
+    if (!logo) return;
+    if (logo.added) {
+      addedIds.push({ logo, key: logoStateKey(logo) });
+    } else {
+      defaultKeys.push(logoStateKey(logo));
+    }
+  });
+
+  const reviewPatch = {};
+  defaultKeys.forEach((key) => {
+    const review = reviewState[key] || {};
+    review.deleted = true;
+    reviewState[key] = review;
+    reviewPatch[key] = review;
+  });
+  if (defaultKeys.length > 0) {
+    writeJson(reviewStoreKey, reviewState);
+    schedulePersist({ review: reviewPatch });
+  }
+
+  if (addedIds.length > 0) {
+    try {
+      await Promise.all(addedIds.map(async ({ logo, key }) => {
+        const response = await fetch(`/api/state?project=${encodeURIComponent(activeProjectId)}&asset=${encodeURIComponent(key)}`, {
+          method: "DELETE",
+          headers: {
+            "x-project-id": activeProjectId,
+            "x-asset-id": key
+          }
+        });
+        if (!response.ok) throw new Error(await response.text());
+        removeLocalAddedAsset(key);
+      }));
+    } catch (error) {
+      console.error("Batch delete failed", error);
+      window.alert(
+        activeLanguage === "nl"
+          ? "Sommige geselecteerde assets konden niet volledig worden verwijderd."
+          : "Some selected assets could not be completely deleted."
+      );
+    }
+  }
+
+  render();
+}
+
+// Bind Batch Bar Action Listeners
+document.getElementById("batchAddTagButton")?.addEventListener("click", batchAddTag);
+document.getElementById("batchRemoveTagButton")?.addEventListener("click", batchRemoveTag);
+document.getElementById("batchDeleteButton")?.addEventListener("click", batchDeleteAssets);
+document.getElementById("batchCancelButton")?.addEventListener("click", clearSelection);
+
+// Bind Pointer Events on Gallery for Mobile Long Press
+gallery.addEventListener("pointerdown", (event) => {
+  if (event.target.closest("textarea")) {
+    event.stopPropagation();
+    return;
+  }
+  const imageButton = event.target.closest(".image-button[data-id]");
+  if (imageButton) {
+    const logo = findLogo(imageButton.dataset.id);
+    if (logo) startLongPressTimer(event, String(logo.id));
+  }
+}, true);
+
+gallery.addEventListener("pointerup", (event) => {
+  clearLongPressTimer();
+  if (longPressActive) {
+    event.preventDefault();
+    event.stopPropagation();
+    longPressActive = false;
+  }
+}, true);
+
+gallery.addEventListener("pointercancel", () => {
+  clearLongPressTimer();
+  longPressActive = false;
+});
+
+gallery.addEventListener("pointermove", handlePointerMove, true);
 
 applyTranslations();
 

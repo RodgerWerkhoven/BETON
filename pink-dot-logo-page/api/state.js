@@ -36,12 +36,20 @@ function statePath(projectId) {
 
 function requestedProject(req) {
   const url = new URL(req.url || "/api/state", `https://${req.headers.host || "localhost"}`);
-  return url.searchParams.get("project") || url.searchParams.get("client") || "Alien";
+  return url.searchParams.get("project") || 
+         url.searchParams.get("client") || 
+         req.headers["x-project-id"] || 
+         req.headers["x-project"] || 
+         "Alien";
 }
 
 function requestedAsset(req) {
   const url = new URL(req.url || "/api/state", `https://${req.headers.host || "localhost"}`);
-  return url.searchParams.get("asset") || url.searchParams.get("id") || "";
+  return url.searchParams.get("asset") || 
+         url.searchParams.get("id") || 
+         req.headers["x-asset-id"] || 
+         req.headers["x-id"] || 
+         "";
 }
 
 async function loadState(client) {

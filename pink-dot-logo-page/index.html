@@ -42,6 +42,7 @@
           <li data-i18n="guideCrop">🪚 snijdt een image bij.</li>
           <li data-i18n="guideCut">✂️ knipt een sheet met meerdere beelden in losse assets om apart te beoordelen.</li>
           <li data-i18n="guideCapture">📸 laat je zelf een zwart kader om 1 beeld trekken; dat beeld komt als los asset naast de sheet te staan.</li>
+          <li data-i18n="guideMultiSelect">Desktop: COMMAND + muisklik om meerdere assets te selecteren. iOS/mobiel: Ingedrukt houden om selectie-modus te starten.</li>
         </ul>
       </section>
       <main class="project-main">
@@ -109,27 +110,31 @@
         <div class="vote-label">VOTES</div>
       </section>
       <div class="top-actions">
-        <button id="topAddAssetButton" class="top-add-asset" type="button" data-i18n="addAsset">VOEG ASSET TOE</button>
-        <div class="count"><span id="count">43</span> <span data-i18n="assets">assets</span></div>
-        <label class="sort-control">
-          <span data-i18n="sortLabel">Volgorde</span>
-          <select id="sortSelect" aria-label="Volgorde van assets">
-            <option value="popular-desc" data-i18n="sortPopularDesc">MEEST POPULAIR EERST</option>
-            <option value="popular-asc" data-i18n="sortPopularAsc">MINST POPULAIR EERST</option>
-            <option value="newest-desc" data-i18n="sortNewestDesc">NIEUWSTE EERST</option>
-            <option value="upload-asc" data-i18n="sortUploadAsc">EERSTE UPLOAD EERST</option>
-            <option value="upload-desc" data-i18n="sortUploadDesc">LAATSTE UPLOAD EERST</option>
-            <option value="size-asc" data-i18n="sortSizeAsc">OP SIZE VAN KLEIN NAAR GROOT</option>
-            <option value="size-desc" data-i18n="sortSizeDesc">OP SIZE VAN GROOT NAAR KLEIN</option>
-          </select>
-        </label>
-        <button class="status-filter" id="addedFilter" type="button" data-filter="TOEGEVOEGD" hidden>Toegevoegd</button>
-        <button class="status-filter" id="deletedFilter" type="button" data-filter="deleted" hidden>Verwijderd</button>
-        <button id="projectOverviewButton" type="button" data-i18n="projects">Projecten</button>
-        <button id="logoutButton" type="button" data-i18n="logout">Uitloggen</button>
-        <div class="language-switch" aria-label="Language">
-          <button type="button" data-lang="nl" aria-label="Nederlands">🇳🇱</button>
-          <button type="button" data-lang="en" aria-label="English">🇬🇧</button>
+        <div class="top-actions-layer layer-1">
+          <button id="topAddAssetButton" class="top-add-asset" type="button" data-i18n="addAsset">VOEG ASSET TOE</button>
+          <div class="count"><span id="count">43</span> <span data-i18n="assets">assets</span></div>
+          <label class="sort-control">
+            <span data-i18n="sortLabel">Volgorde</span>
+            <select id="sortSelect" aria-label="Volgorde van assets">
+              <option value="popular-desc" data-i18n="sortPopularDesc">MEEST POPULAIR EERST</option>
+              <option value="popular-asc" data-i18n="sortPopularAsc">MINST POPULAIR EERST</option>
+              <option value="newest-desc" data-i18n="sortNewestDesc">NIEUWSTE EERST</option>
+              <option value="upload-asc" data-i18n="sortUploadAsc">EERSTE UPLOAD EERST</option>
+              <option value="upload-desc" data-i18n="sortUploadDesc">LAATSTE UPLOAD EERST</option>
+              <option value="size-asc" data-i18n="sortSizeAsc">OP SIZE VAN KLEIN NAAR GROOT</option>
+              <option value="size-desc" data-i18n="sortSizeDesc">OP SIZE VAN GROOT NAAR KLEIN</option>
+            </select>
+          </label>
+        </div>
+        <div class="top-actions-layer layer-2">
+          <button class="status-filter" id="addedFilter" type="button" data-filter="TOEGEVOEGD" hidden>Toegevoegd</button>
+          <button class="status-filter" id="deletedFilter" type="button" data-filter="deleted" hidden>Verwijderd</button>
+          <button id="projectOverviewButton" type="button" data-i18n="projects">Projecten</button>
+          <button id="logoutButton" type="button" data-i18n="logout">Uitloggen</button>
+          <div class="language-switch" aria-label="Language">
+            <button type="button" data-lang="nl" aria-label="Nederlands">🇳🇱</button>
+            <button type="button" data-lang="en" aria-label="English">🇬🇧</button>
+          </div>
         </div>
       </div>
     </header>
@@ -219,6 +224,14 @@
       </div>
       <p id="captureStatus" class="crop-meta" role="alert"></p>
     </dialog>
+    </div>
+
+    <div id="batchActionBar" class="batch-action-bar" hidden>
+      <span class="batch-count"><span id="batchCount">0</span> <span data-i18n="selected">geselecteerd</span></span>
+      <button id="batchAddTagButton" type="button" data-i18n="batchAddTag">🏷️ + Tag</button>
+      <button id="batchRemoveTagButton" type="button" data-i18n="batchRemoveTag">🏷️ - Tag</button>
+      <button id="batchDeleteButton" class="batch-delete" type="button" aria-label="Verwijderen">☠️</button>
+      <button id="batchCancelButton" class="batch-cancel" type="button" aria-label="Sluiten">×</button>
     </div>
 
     <img class="brand-mark" src="/assets/another-dimension-logo.png" alt="ANÓTHER DIMENSION" />

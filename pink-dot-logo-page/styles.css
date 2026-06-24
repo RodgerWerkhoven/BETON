@@ -489,7 +489,7 @@ h1 {
   padding: 10px 12px;
   font-size: 14px;
   font-weight: 800;
-  background: var(--accent);
+  background: var(--voter-green);
 }
 
 .language-switch {
@@ -513,20 +513,27 @@ h1 {
 }
 
 .language-switch button.active {
-  background: var(--dark);
+  background: var(--accent);
 }
 
 .top-actions {
   grid-area: actions;
   display: flex;
+  flex-direction: column;
   max-width: none;
   align-items: flex-end;
   justify-content: flex-end;
-  flex-wrap: nowrap;
   gap: 8px;
 }
 
-.top-actions > button {
+.top-actions-layer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.top-actions-layer > button {
   align-items: center;
   background: var(--accent);
   border: 1px solid var(--dark);
@@ -613,7 +620,7 @@ main {
   padding: 8px 12px;
 }
 
-.top-actions > button {
+.top-actions-layer > button {
   font-size: 16px;
 }
 
@@ -1064,7 +1071,7 @@ main {
   width: 44px;
   height: 44px;
   padding: 0;
-  font-size: 25px;
+  font-size: 34px;
   line-height: 1;
   text-decoration: none;
 }
@@ -1075,7 +1082,7 @@ main {
 
 .capture-logo {
   background: var(--capture-button-bg, var(--voter-yellow));
-  font-size: 32px;
+  font-size: 34px;
   line-height: 1;
 }
 
@@ -1733,7 +1740,11 @@ main {
     align-items: end;
   }
 
-  .top-actions > button,
+  .top-actions-layer {
+    display: contents;
+  }
+
+  .top-actions-layer > button,
   .topbar #projectOverviewButton,
   .topbar #logoutButton,
   .topbar .top-add-asset,
@@ -1746,7 +1757,7 @@ main {
     padding: 5px 6px;
   }
 
-  .top-actions > button {
+  .top-actions-layer > button {
     width: 100%;
     min-width: 0;
     flex: none;
@@ -1951,11 +1962,11 @@ main {
     min-width: 34px;
     height: 34px;
     min-height: 34px;
-    font-size: 20px;
+    font-size: 26px;
   }
 
   .capture-logo {
-    font-size: 27px;
+    font-size: 26px;
   }
 
   .undo-card {
@@ -2075,5 +2086,120 @@ main {
 @media (max-width: 380px) {
   .comment-row {
     grid-template-columns: 1fr;
+  }
+}
+
+.logo-card.selected {
+  position: relative;
+  box-shadow: 0 0 0 3px var(--accent);
+}
+
+.logo-card.selected::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 48, 214, 0.15);
+  pointer-events: none;
+  border-radius: inherit;
+  z-index: 2;
+}
+
+.batch-action-bar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(244, 241, 234, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--dark);
+  border-radius: 999px;
+  padding: 8px 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUp {
+  from {
+    transform: translate(-50%, 100px);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+
+.batch-count {
+  font-size: 13px;
+  font-weight: 850;
+  color: var(--ink);
+  margin-right: 8px;
+  text-transform: uppercase;
+}
+
+.batch-action-bar button {
+  min-height: 36px;
+  border: 1px solid var(--dark);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 850;
+  font-size: 12px;
+  padding: 6px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.batch-action-bar button:hover {
+  background: var(--accent);
+}
+
+.batch-action-bar button.batch-delete {
+  background: var(--accent);
+}
+
+.batch-action-bar button.batch-delete:hover {
+  background: #ff0055;
+  color: #ffffff;
+}
+
+.batch-action-bar button.batch-cancel {
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  min-height: auto;
+}
+
+.batch-action-bar button.batch-cancel:hover {
+  color: var(--accent);
+}
+
+@media (max-width: 620px) {
+  .batch-action-bar {
+    width: calc(100% - 32px);
+    bottom: 16px;
+    padding: 6px 12px;
+    gap: 8px;
+  }
+  .batch-count {
+    font-size: 11px;
+    margin-right: 4px;
+  }
+  .batch-action-bar button {
+    font-size: 11px;
+    padding: 4px 8px;
+    min-height: 30px;
   }
 }

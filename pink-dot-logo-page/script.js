@@ -1182,9 +1182,44 @@ function currentCommentPrefix() {
 }
 
 function commentValue(review) {
-  if (review.comment) return review.comment;
-  if (review.commentOpen) return `${currentCommentPrefix()} `;
+  if (!review || !review.comment) return "";
+  const prefix = currentCommentPrefix();
+  const lines = review.comment.split(/\r?\n/);
+  const userLine = lines.find(l => l.startsWith(prefix));
+  if (userLine) {
+    return userLine.substring(prefix.length).trim();
+  }
   return "";
+}
+
+function renderCommentsList(review) {
+  if (!review || !review.comment) return "";
+  const lines = review.comment.split(/\r?\n/).filter(l => l.trim());
+  return lines.map(line => {
+    let voterClass = "";
+    let voterName = "";
+    let content = line;
+    if (line.startsWith("R:")) {
+      voterClass = "voter-r";
+      voterName = "RODGER";
+      content = line.substring(2).trim();
+    } else if (line.startsWith("V:")) {
+      voterClass = "voter-v";
+      voterName = "VINCE";
+      content = line.substring(2).trim();
+    } else if (line.startsWith("B:")) {
+      voterClass = "voter-b";
+      voterName = "DAVID";
+      content = line.substring(2).trim();
+    } else {
+      return `<div class="comment-bubble"><span>${escapeHtml(line)}</span></div>`;
+    }
+    if (!content) return "";
+    return `<div class="comment-bubble ${voterClass}">
+      <strong>${voterName}</strong>
+      <span>${escapeHtml(content)}</span>
+    </div>`;
+  }).join("");
 }
 
 function fitTextarea(textarea) {
@@ -1200,13 +1235,28 @@ function updateCommentFromControl(control) {
   const logo = findLogo(control.dataset.id);
   if (!logo) return null;
   const review = logoReview(logo);
-  if (!review.comment && control.value.trim()) {
-    const prefix = currentCommentPrefix();
-    if (!/^[RAB]:\s/.test(control.value)) control.value = `${prefix} ${control.value}`;
+  const prefix = currentCommentPrefix();
+  
+  let lines = review.comment ? review.comment.split(/\r?\n/) : [];
+  lines = lines.filter(l => l.trim() && !l.startsWith(prefix));
+  
+  const val = control.value.trim();
+  if (val) {
+    lines.push(`${prefix} ${val}`);
   }
-  review.comment = control.value;
+  
+  review.comment = lines.join("\n");
   const key = logoStateKey(logo);
   reviewState[key] = review;
+  
+  const card = control.closest(".logo-card, .lightbox-dialog");
+  if (card) {
+    const commentsList = card.querySelector(`.comments-list[data-id="${logo.id}"], .comments-list`);
+    if (commentsList) {
+      commentsList.innerHTML = renderCommentsList(review);
+    }
+  }
+  
   fitTextarea(control);
   saveReviewItem(key);
   return { logo, review, key };
@@ -1322,17 +1372,28 @@ function render() {
         const isSelected = selectedAssetIds.has(String(logo.id));
         return `
         <article class="logo-card ${review.deleted ? "is-deleted" : ""} ${isSelected ? "selected" : ""}" data-id="${logo.id}">
-          ${croppable
-            ? `<button class="image-button" type="button" data-id="${logo.id}">
-                <img src="${imageSource(logo)}" data-fallback="${imageFallbackSource(logo)}" alt="${safeName}, ${logo.group}" loading="lazy" />
-              </button>`
-            : renderMediaStage(logo, safeName)}
-          <div class="meta">
-            <div class="meta-row">
-              <span class="number">${escapeHtml(logoNumberLabel(logo))}</span>
-              ${renderTags(logo, review)}
+          <div class="media-container">
+            ${croppable
+              ? `<button class="image-button" type="button" data-id="${logo.id}">
+                  <img src="${imageSource(logo)}" data-fallback="${imageFallbackSource(logo)}" alt="${safeName}, ${logo.group}" loading="lazy" />
+                </button>`
+              : renderMediaStage(logo, safeName)}
+            <div class="extras-panel ${review.extrasOpen ? "is-open" : ""}">
+              <div class="meta-row">
+                <span class="number">${escapeHtml(logoNumberLabel(logo))}</span>
+                ${renderTags(logo, review)}
+              </div>
+              <div class="source">${logo.added ? "" : `${logo.sourceIndex}.${logo.dotIndex}: `}${safeSource}</div>
+              <div class="card-actions">
+                ${croppable ? `<button class="edit-logo" type="button" data-id="${logo.id}" aria-label="Bijsnijden" ${editButtonStyle(logo)}>🪚</button>` : ""}
+                ${croppable ? `<button class="capture-logo" type="button" data-action="capture" data-id="${logo.id}" aria-label="Single capture" ${captureButtonStyle(logo)}>📸</button>` : ""}
+                ${croppable && logo.added ? `<button class="sheet-logo" type="button" data-action="sheet-cut" data-id="${logo.id}" aria-label="Sheet cut-up" ${sheetButtonStyle(logo)}>✂️</button>` : ""}
+                <button class="undo-card" type="button" data-action="undo" data-id="${logo.id}" ${cropHistory[logoStateKey(logo)]?.length ? "" : "disabled"}>↩️</button>
+                <button class="delete-logo ${review.deleted ? "is-restore" : ""}" type="button" data-action="delete" data-id="${logo.id}">${review.deleted ? "Herstel" : "☠️"}</button>
+              </div>
             </div>
-            <div class="source">${logo.added ? `${escapeHtml(t("sourceAdded"))} ${safeSource}` : `${escapeHtml(t("sourceOriginal"))} ${logo.sourceIndex}.${logo.dotIndex}: ${safeSource}`}</div>
+          </div>
+          <div class="meta">
             <div class="rating" role="group" aria-label="Rating voor image ${logo.id}">
               ${ratingOptions.map((rating) => {
                 const votes = votesFor(review);
@@ -1355,16 +1416,13 @@ function render() {
             </div>
             <div class="comment-row">
               <button class="comment-toggle" type="button" data-action="comment-toggle" data-id="${logo.id}">💬</button>
-              <label class="comment ${review.commentOpen || review.comment ? "is-open" : ""}">
+              <div class="comment ${review.commentOpen || review.comment ? "is-open" : ""}">
+                <div class="comments-list" data-id="${logo.id}">
+                  ${renderCommentsList(review)}
+                </div>
                 <textarea data-action="comment" data-id="${logo.id}" rows="1" placeholder="${currentCommentPrefix()} ${escapeHtml(t("writeComment"))}">${escapeHtml(commentValue(review))}</textarea>
-              </label>
-            </div>
-            <div class="card-actions">
-              ${croppable ? `<button class="edit-logo" type="button" data-id="${logo.id}" aria-label="Bijsnijden" ${editButtonStyle(logo)}>🪚</button>` : ""}
-              ${croppable ? `<button class="capture-logo" type="button" data-action="capture" data-id="${logo.id}" aria-label="Single capture" ${captureButtonStyle(logo)}>📸</button>` : ""}
-              ${croppable && logo.added ? `<button class="sheet-logo" type="button" data-action="sheet-cut" data-id="${logo.id}" aria-label="Sheet cut-up" ${sheetButtonStyle(logo)}>✂️</button>` : ""}
-              <button class="undo-card" type="button" data-action="undo" data-id="${logo.id}" ${cropHistory[logoStateKey(logo)]?.length ? "" : "disabled"}>↩️</button>
-              <button class="delete-logo ${review.deleted ? "is-restore" : ""}" type="button" data-action="delete" data-id="${logo.id}">${review.deleted ? "Herstel" : "☠️"}</button>
+              </div>
+              <button class="panel-toggle" type="button" data-action="toggle-extras" data-id="${logo.id}" aria-label="Details">${review.extrasOpen ? "⇣" : "⇡"}</button>
             </div>
           </div>
         </article>
@@ -1593,22 +1651,52 @@ function renderLightboxTools(logo) {
   const undoDisabled = cropHistory[key]?.length ? "" : "disabled";
   lightboxTools.hidden = false;
   lightboxTools.innerHTML = `
-    <div class="lightbox-tools-meta">
-      <strong>${escapeHtml(logoNumberLabel(logo))}</strong>
-      <span>${escapeHtml(imageCopy(logo.name || logo.source || logo.file || ""))}</span>
+    <!-- Top Row: Rating Emojis -->
+    <div class="lightbox-rating-row">
+      <div class="rating" role="group" aria-label="Rating voor image ${logo.id}">
+        ${ratingOptions.map((rating) => {
+          const votes = votesFor(review);
+          const voteVoters = votersForRating(votes, rating);
+          const currentVoted = votes[currentVoterKey()] === rating;
+          return `
+          <button
+            class="rating-button"
+            type="button"
+            data-action="rating"
+            data-id="${logo.id}"
+            data-rating="${rating}"
+            data-vote-count="${voteVoters.length}"
+            data-current-voted="${currentVoted ? "true" : "false"}"
+            aria-label="Rating ${rating}"
+            ${ratingButtonStyle(voteVoters)}
+          >${rating}</button>
+        `;
+        }).join("")}
+      </div>
     </div>
-    <div class="lightbox-comment-row">
-      <button class="comment-toggle" type="button" data-action="comment-toggle" data-id="${logo.id}">💬</button>
-      <label class="comment ${review.commentOpen || review.comment ? "is-open" : ""}">
-        <textarea data-action="comment" data-id="${logo.id}" rows="1" placeholder="${currentCommentPrefix()} ${escapeHtml(t("writeComment"))}">${escapeHtml(commentValue(review))}</textarea>
-      </label>
-    </div>
-    <div class="lightbox-tool-actions">
-      ${croppable ? `<button class="edit-logo" type="button" data-action="crop" data-id="${logo.id}" aria-label="Bijsnijden" ${editButtonStyle(logo)}>🪚</button>` : ""}
-      ${croppable ? `<button class="capture-logo" type="button" data-action="capture" data-id="${logo.id}" aria-label="Single capture" ${captureButtonStyle(logo)}>📸</button>` : ""}
-      ${croppable && logo.added ? `<button class="sheet-logo" type="button" data-action="sheet-cut" data-id="${logo.id}" aria-label="Sheet cut-up" ${sheetButtonStyle(logo)}>✂️</button>` : ""}
-      ${croppable ? `<button class="undo-card" type="button" data-action="undo" data-id="${logo.id}" ${undoDisabled}>↩️</button>` : ""}
-      <button class="delete-logo ${review.deleted ? "is-restore" : ""}" type="button" data-action="delete" data-id="${logo.id}">${review.deleted ? "Herstel" : "☠️"}</button>
+    
+    <!-- Bottom Row: Meta, Comments, and Action buttons -->
+    <div class="lightbox-bottom-row">
+      <div class="lightbox-tools-meta">
+        <strong>${escapeHtml(logoNumberLabel(logo))}</strong>
+        <span>${escapeHtml(imageCopy(logo.name || logo.source || logo.file || ""))}</span>
+      </div>
+      <div class="lightbox-comment-row">
+        <button class="comment-toggle" type="button" data-action="comment-toggle" data-id="${logo.id}">💬</button>
+        <div class="comment ${review.commentOpen || review.comment ? "is-open" : ""}">
+          <div class="comments-list" data-id="${logo.id}">
+            ${renderCommentsList(review)}
+          </div>
+          <textarea data-action="comment" data-id="${logo.id}" rows="1" placeholder="${currentCommentPrefix()} ${escapeHtml(t("writeComment"))}">${escapeHtml(commentValue(review))}</textarea>
+        </div>
+      </div>
+      <div class="lightbox-tool-actions">
+        ${croppable ? `<button class="edit-logo" type="button" data-action="crop" data-id="${logo.id}" aria-label="Bijsnijden" ${editButtonStyle(logo)}>🪚</button>` : ""}
+        ${croppable ? `<button class="capture-logo" type="button" data-action="capture" data-id="${logo.id}" aria-label="Single capture" ${captureButtonStyle(logo)}>📸</button>` : ""}
+        ${croppable && logo.added ? `<button class="sheet-logo" type="button" data-action="sheet-cut" data-id="${logo.id}" aria-label="Sheet cut-up" ${sheetButtonStyle(logo)}>✂️</button>` : ""}
+        ${croppable ? `<button class="undo-card" type="button" data-action="undo" data-id="${logo.id}" ${undoDisabled}>↩️</button>` : ""}
+        <button class="delete-logo ${review.deleted ? "is-restore" : ""}" type="button" data-action="delete" data-id="${logo.id}">${review.deleted ? "Herstel" : "☠️"}</button>
+      </div>
     </div>
   `;
   const textarea = lightboxTools.querySelector("textarea");
@@ -3572,6 +3660,7 @@ voteButtons.addEventListener("click", (event) => {
 sortSelect.addEventListener("change", () => {
   activeSort = sortSelect.value;
   localStorage.setItem(sortStoreKey, activeSort);
+  window.scrollTo(0, 0);
   render();
 });
 
@@ -3690,6 +3779,19 @@ gallery.addEventListener("click", async (event) => {
         }, 0);
       }
     }
+    if (action.dataset.action === "toggle-extras") {
+      review.extrasOpen = !review.extrasOpen;
+      reviewState[key] = review;
+      saveReviewItem(key);
+      const card = action.closest(".logo-card");
+      if (card) {
+        const panel = card.querySelector(".extras-panel");
+        if (panel) {
+          panel.classList.toggle("is-open", review.extrasOpen);
+        }
+        action.textContent = review.extrasOpen ? "⇣" : "⇡";
+      }
+    }
     if (action.dataset.action === "undo" && undoLogoCrop(logo)) {
       render();
     }
@@ -3743,6 +3845,50 @@ lightboxTools.addEventListener("click", async (event) => {
   if (!logo) return;
   const review = logoReview(logo);
   const key = logoStateKey(logo);
+  if (action.dataset.action === "rating") {
+    holdRealtimeVoteSync();
+    const voterKey = currentVoterKey();
+    const voterRegistration = ensureCurrentVoterRegistered({ persist: false });
+    const requestId = (ratingRequestSerial += 1);
+    latestRatingRequest.set(key, requestId);
+    const rating = action.dataset.rating;
+    const localVotes = votesFor(review);
+    const shouldRemoveVote = action.dataset.currentVoted === "true" || localVotes[voterKey] === rating;
+    const optimisticReview = { ...review, votes: { ...localVotes } };
+    if (shouldRemoveVote) delete optimisticReview.votes[voterKey];
+    else optimisticReview.votes[voterKey] = rating;
+    delete optimisticReview.ratings;
+    delete optimisticReview.rating;
+    reviewState[key] = optimisticReview;
+    writeJson(reviewStoreKey, reviewState);
+    render();
+    renderLightboxTools(logo);
+    refreshReviewItem(key)
+      .then(() => {
+        if (latestRatingRequest.get(key) !== requestId) return null;
+        const refreshedReview = { ...logoReview(logo) };
+        refreshedReview.votes = votesFor(refreshedReview);
+        if (shouldRemoveVote) delete refreshedReview.votes[voterKey];
+        else refreshedReview.votes[voterKey] = rating;
+        delete refreshedReview.ratings;
+        delete refreshedReview.rating;
+        reviewState[key] = refreshedReview;
+        writeJson(reviewStoreKey, reviewState);
+        const patch = { voteUpdates: { [key]: { [voterKey]: shouldRemoveVote ? null : rating } } };
+        if (voterRegistration.changed && voterRegistration.color) patch.voters = { [voterKey]: voterRegistration.color };
+        return queuePersist(patch);
+      })
+      .then((result) => {
+        if (result !== null && latestRatingRequest.get(key) === requestId) {
+          render();
+          renderLightboxTools(logo);
+        }
+      })
+      .catch(() => {
+        schedulePersist({ voteUpdates: { [key]: { [voterKey]: shouldRemoveVote ? null : rating } } });
+      });
+    return;
+  }
   if (action.dataset.action === "comment-toggle") {
     review.commentOpen = !review.commentOpen;
     if (review.commentOpen && !review.comment) review.comment = `${currentCommentPrefix()} `;

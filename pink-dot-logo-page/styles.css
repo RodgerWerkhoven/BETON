@@ -1082,8 +1082,11 @@ main {
 
 .capture-logo {
   background: var(--capture-button-bg, var(--voter-yellow));
-  font-size: 34px;
-  line-height: 1;
+  font-size: 32px;
+  line-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .undo-card,
@@ -1141,16 +1144,17 @@ main {
 }
 
 .comment-row {
-  display: grid;
-  grid-template-columns: 46px minmax(0, 1fr);
-  align-items: start;
+  display: flex;
+  align-items: center;
   gap: 8px;
+  width: 100%;
 }
 
 .comment {
   display: none;
-  gap: 5px;
+  flex: 1;
   min-width: 0;
+  gap: 5px;
 }
 
 .comment.is-open {
@@ -1347,13 +1351,12 @@ main {
   place-items: center;
   width: 56px;
   height: 56px;
-  border: 2px solid var(--dark);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.9);
+  border: 0;
+  background: transparent;
   color: var(--ink);
   cursor: pointer;
   font: inherit;
-  font-size: 30px;
+  font-size: 42px;
   font-weight: 900;
   line-height: 1;
   transform: translateY(-50%);
@@ -2041,8 +2044,9 @@ main {
   .lightbox-nav {
     width: 42px;
     height: 42px;
-    border-width: 1px;
-    font-size: 22px;
+    border: 0;
+    background: transparent;
+    font-size: 32px;
   }
 
   .lightbox-tools {
@@ -2201,5 +2205,152 @@ main {
     font-size: 11px;
     padding: 4px 8px;
     min-height: 30px;
+  }
+}
+
+/* Collapsible extras panel overlaying images */
+.media-container {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 240px;
+  background: #ebe6dc;
+  display: grid;
+  place-items: stretch;
+}
+
+@media (max-width: 768px) {
+  .media-container {
+    height: auto;
+  }
+}
+
+.extras-panel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-top: 1px solid var(--line);
+  padding: 10px 12px;
+  z-index: 3;
+  transform: translateY(100%);
+  transition: transform 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.extras-panel.is-open {
+  transform: translateY(0);
+}
+
+.panel-toggle {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid var(--dark);
+  background: #ffffff;
+  color: var(--dark);
+  font-size: 16px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.12);
+  padding: 0;
+  margin-left: auto;
+  flex: 0 0 32px;
+  user-select: none;
+}
+
+/* Scrollable nested comment list */
+.comments-list {
+  max-height: 120px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 6px;
+  padding-right: 4px;
+}
+
+.comment-bubble {
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.35;
+  border: 1px solid var(--line);
+  background: #fffdf8;
+  text-align: left;
+}
+
+.comment-bubble.voter-r {
+  border-color: var(--accent);
+  background: rgba(255, 48, 214, 0.05);
+}
+
+.comment-bubble.voter-v {
+  border-color: var(--voter-green);
+  background: rgba(96, 212, 111, 0.05);
+}
+
+.comment-bubble.voter-b {
+  border-color: var(--voter-blue);
+  background: rgba(154, 223, 255, 0.08);
+}
+
+.comment-bubble strong {
+  font-size: 11px;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 2px;
+}
+
+/* Lightbox Voting & Layout */
+.lightbox-rating-row {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.lightbox-rating-row .rating {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  max-width: 400px;
+  width: 100%;
+}
+
+.lightbox-rating-row .rating-button {
+  flex: 1;
+  min-height: 48px;
+  font-size: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.lightbox-rating-row .rating-button[data-current-voted="true"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--dark);
+}
+
+.lightbox-bottom-row {
+  display: grid;
+  grid-template-columns: minmax(120px, auto) minmax(180px, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .lightbox-bottom-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
   }
 }

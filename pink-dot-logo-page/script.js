@@ -581,11 +581,30 @@ function imageCopy(value) {
   return String(value || "").replace(/\blogo's\b/gi, "images").replace(/\blogos\b/gi, "images").replace(/\blogo\b/gi, "image");
 }
 
-function imageSource(logo) {
+function optimizedImageUrl(url, width = 384, quality = 75) {
+  if (!url) return "";
+  if (url.startsWith("data:")) return url;
+  if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+    return url;
+  }
+  let absoluteUrl = url;
+  if (url.startsWith("/")) {
+    absoluteUrl = window.location.origin + url;
+  }
+  return `/_vercel/image?url=${encodeURIComponent(absoluteUrl)}&w=${width}&q=${quality}`;
+}
+
+function imageSource(logo, options = {}) {
   const key = logoStateKey(logo);
-  if (logo.dataUrl) return cropOverrides[key] || logo.dataUrl;
-  if (logo.blobPathname || logo.url) return cropOverrides[key] || mediaSource(logo);
-  return cropOverrides[key] || logoPath(logo.file);
+  let src = "";
+  if (logo.dataUrl) src = cropOverrides[key] || logo.dataUrl;
+  else if (logo.blobPathname || logo.url) src = cropOverrides[key] || mediaSource(logo);
+  else src = cropOverrides[key] || logoPath(logo.file);
+
+  if (options.thumbnail) {
+    return optimizedImageUrl(src, 384, 75);
+  }
+  return src;
 }
 
 function imageFallbackSource(logo) {
@@ -810,10 +829,12 @@ function renderMediaStage(logo, safeName) {
   if (isVideoLogo(logo)) {
     return `
       <div class="media-frame video-frame">
-        <video controls preload="metadata" src="${src}" aria-label="${safeName}"></video>
+        <div class="video-thumbnail" data-action="open-media" data-id="${logo.id}">
+          <video preload="metadata" src="${src}" muted playsinline></video>
+          <div class="video-play-badge">▶️</div>
+        </div>
         <div class="media-actions">
           <button class="media-open" type="button" data-action="open-media" data-id="${logo.id}">Groot</button>
-          <button class="media-stop" type="button" data-action="stop-media" data-id="${logo.id}">Stop</button>
         </div>
       </div>
     `;
@@ -822,10 +843,12 @@ function renderMediaStage(logo, safeName) {
     return `
       <div class="media-frame audio-frame">
         <strong>${safeName}</strong>
-        <audio controls preload="metadata" src="${src}" aria-label="${safeName}"></audio>
+        <div class="custom-audio-player" data-id="${logo.id}" data-src="${src}">
+          <button class="audio-play-btn" type="button" data-action="play-audio">▶️ Play</button>
+          <div class="audio-loader" hidden></div>
+        </div>
         <div class="media-actions">
           <button class="media-open" type="button" data-action="open-media" data-id="${logo.id}">Groot</button>
-          <button class="media-stop" type="button" data-action="stop-media" data-id="${logo.id}">Stop</button>
         </div>
       </div>
     `;
@@ -1178,7 +1201,8 @@ function renderFilters() {
 function currentCommentPrefix() {
   if (currentSession?.role === "admin") return "R:";
   if (currentSession?.role === "voter3") return "B:";
-  return "A:";
+  if (currentSession?.role === "client") return "V:";
+  return "V:"; // Default to Vince (Green)
 }
 
 function commentValue(review) {
@@ -1375,7 +1399,7 @@ function render() {
           <div class="media-container">
             ${croppable
               ? `<button class="image-button" type="button" data-id="${logo.id}">
-                  <img src="${imageSource(logo)}" data-fallback="${imageFallbackSource(logo)}" alt="${safeName}, ${logo.group}" loading="lazy" />
+                  <img src="${imageSource(logo, { thumbnail: true })}" data-fallback="${imageFallbackSource(logo)}" alt="${safeName}, ${logo.group}" loading="lazy" />
                 </button>`
               : renderMediaStage(logo, safeName)}
             <div class="extras-panel ${review.extrasOpen ? "is-open" : ""}">
@@ -1644,15 +1668,16 @@ function renderLightboxChrome(logo) {
 }
 
 function renderLightboxTools(logo) {
-  if (!logo || !lightboxTools) return;
+  if (!logo) return;
   const review = logoReview(logo);
   const key = logoStateKey(logo);
   const croppable = isImageLogo(logo) && !logo.uploading && !logo.uploadError;
   const undoDisabled = cropHistory[key]?.length ? "" : "disabled";
-  lightboxTools.hidden = false;
-  lightboxTools.innerHTML = `
-    <!-- Top Row: Rating Emojis -->
-    <div class="lightbox-rating-row">
+
+  // Render ratings in the centered container under the image
+  const ratingContainer = document.getElementById("lightboxRatingContainer");
+  if (ratingContainer) {
+    ratingContainer.innerHTML = `
       <div class="rating" role="group" aria-label="Rating voor image ${logo.id}">
         ${ratingOptions.map((rating) => {
           const votes = votesFor(review);
@@ -1673,34 +1698,39 @@ function renderLightboxTools(logo) {
         `;
         }).join("")}
       </div>
-    </div>
-    
-    <!-- Bottom Row: Meta, Comments, and Action buttons -->
-    <div class="lightbox-bottom-row">
-      <div class="lightbox-tools-meta">
-        <strong>${escapeHtml(logoNumberLabel(logo))}</strong>
-        <span>${escapeHtml(imageCopy(logo.name || logo.source || logo.file || ""))}</span>
-      </div>
-      <div class="lightbox-comment-row">
-        <button class="comment-toggle" type="button" data-action="comment-toggle" data-id="${logo.id}">💬</button>
-        <div class="comment ${review.commentOpen || review.comment ? "is-open" : ""}">
-          <div class="comments-list" data-id="${logo.id}">
-            ${renderCommentsList(review)}
+    `;
+  }
+
+  // Render metadata, comments and action buttons in the bottom toolbar
+  if (lightboxTools) {
+    lightboxTools.hidden = false;
+    lightboxTools.innerHTML = `
+      <div class="lightbox-bottom-row" style="width: 100%;">
+        <div class="lightbox-tools-meta">
+          <strong>${escapeHtml(logoNumberLabel(logo))}</strong>
+          <span>${escapeHtml(imageCopy(logo.name || logo.source || logo.file || ""))}</span>
+        </div>
+        <div class="lightbox-comment-row">
+          <button class="comment-toggle" type="button" data-action="comment-toggle" data-id="${logo.id}">💬</button>
+          <div class="comment ${review.commentOpen || review.comment ? "is-open" : ""}">
+            <div class="comments-list" data-id="${logo.id}">
+              ${renderCommentsList(review)}
+            </div>
+            <textarea data-action="comment" data-id="${logo.id}" rows="1" placeholder="${currentCommentPrefix()} ${escapeHtml(t("writeComment"))}">${escapeHtml(commentValue(review))}</textarea>
           </div>
-          <textarea data-action="comment" data-id="${logo.id}" rows="1" placeholder="${currentCommentPrefix()} ${escapeHtml(t("writeComment"))}">${escapeHtml(commentValue(review))}</textarea>
+        </div>
+        <div class="lightbox-tool-actions">
+          ${croppable ? `<button class="edit-logo" type="button" data-action="crop" data-id="${logo.id}" aria-label="Bijsnijden" ${editButtonStyle(logo)}>🪚</button>` : ""}
+          ${croppable ? `<button class="capture-logo" type="button" data-action="capture" data-id="${logo.id}" aria-label="Single capture" ${captureButtonStyle(logo)}>📸</button>` : ""}
+          ${croppable && logo.added ? `<button class="sheet-logo" type="button" data-action="sheet-cut" data-id="${logo.id}" aria-label="Sheet cut-up" ${sheetButtonStyle(logo)}>✂️</button>` : ""}
+          ${croppable ? `<button class="undo-card" type="button" data-action="undo" data-id="${logo.id}" ${undoDisabled}>↩️</button>` : ""}
+          <button class="delete-logo ${review.deleted ? "is-restore" : ""}" type="button" data-action="delete" data-id="${logo.id}">${review.deleted ? "Herstel" : "☠️"}</button>
         </div>
       </div>
-      <div class="lightbox-tool-actions">
-        ${croppable ? `<button class="edit-logo" type="button" data-action="crop" data-id="${logo.id}" aria-label="Bijsnijden" ${editButtonStyle(logo)}>🪚</button>` : ""}
-        ${croppable ? `<button class="capture-logo" type="button" data-action="capture" data-id="${logo.id}" aria-label="Single capture" ${captureButtonStyle(logo)}>📸</button>` : ""}
-        ${croppable && logo.added ? `<button class="sheet-logo" type="button" data-action="sheet-cut" data-id="${logo.id}" aria-label="Sheet cut-up" ${sheetButtonStyle(logo)}>✂️</button>` : ""}
-        ${croppable ? `<button class="undo-card" type="button" data-action="undo" data-id="${logo.id}" ${undoDisabled}>↩️</button>` : ""}
-        <button class="delete-logo ${review.deleted ? "is-restore" : ""}" type="button" data-action="delete" data-id="${logo.id}">${review.deleted ? "Herstel" : "☠️"}</button>
-      </div>
-    </div>
-  `;
-  const textarea = lightboxTools.querySelector("textarea");
-  if (textarea) fitTextarea(textarea);
+    `;
+    const textarea = lightboxTools.querySelector("textarea");
+    if (textarea) fitTextarea(textarea);
+  }
 }
 
 function applyLightboxZoom() {
@@ -1800,6 +1830,8 @@ function closeLightbox() {
   lightboxImage.removeAttribute("src");
   lightboxTools.hidden = true;
   lightboxTools.innerHTML = "";
+  const ratingContainer = document.getElementById("lightboxRatingContainer");
+  if (ratingContainer) ratingContainer.innerHTML = "";
   activeLightboxLogo = null;
   resetLightboxZoom();
   if (lightboxDialog.open) lightboxDialog.close();
@@ -1952,7 +1984,7 @@ async function fileToStoredSource(file, id, onProgress) {
 
 async function addFiles(files) {
   let comment = document.querySelector("#newUploadComment")?.value.trim() || "";
-  if (comment && !/^[RA]:\s/.test(comment)) comment = `${currentCommentPrefix()} ${comment}`;
+  if (comment && !/^[RVBA]:\s/.test(comment)) comment = `${currentCommentPrefix()} ${comment}`;
   const incomingFiles = Array.from(files);
   const seen = existingUploadKeys();
   const uploadNumbers = usedUploadNumbers();
@@ -3808,9 +3840,29 @@ gallery.addEventListener("click", async (event) => {
     if (action.dataset.action === "capture") {
       openCaptureTool(logo);
     }
+    if (action.dataset.action === "play-audio") {
+      const player = action.closest(".custom-audio-player");
+      const loader = player.querySelector(".audio-loader");
+      const src = player.dataset.src;
+      action.hidden = true;
+      loader.removeAttribute("hidden");
+      const audio = document.createElement("audio");
+      audio.controls = true;
+      audio.src = src;
+      audio.autoplay = true;
+      audio.oncanplay = () => {
+        loader.hidden = true;
+        player.appendChild(audio);
+      };
+      audio.onerror = () => {
+        loader.hidden = true;
+        action.hidden = false;
+        alert("Audio laden mislukt");
+      };
+    }
     return;
   }
-  const imageButton = event.target.closest(".image-button[data-id]");
+  const imageButton = event.target.closest(".image-button[data-id], .video-thumbnail[data-id]");
   if (imageButton) {
     const logo = findLogo(imageButton.dataset.id);
     if (logo) openLightbox(logo);

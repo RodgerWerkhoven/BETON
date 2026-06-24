@@ -151,9 +151,14 @@
       <button id="lightboxClose" class="lightbox-close" type="button" aria-label="Sluiten">×</button>
       <button id="lightboxPrev" class="lightbox-nav lightbox-prev" type="button" aria-label="Vorige image">⬅️</button>
       <button id="lightboxNext" class="lightbox-nav lightbox-next" type="button" aria-label="Volgende image">➡️</button>
-      <div id="lightboxMediaStage" class="lightbox-media-stage"></div>
+      <div class="lightbox-content-wrapper">
+        <div class="lightbox-media-container">
+          <div id="lightboxMediaStage" class="lightbox-media-stage"></div>
+          <img id="lightboxImage" alt="" />
+        </div>
+        <div id="lightboxRatingContainer" class="lightbox-rating-container"></div>
+      </div>
       <button id="lightboxStop" class="media-stop lightbox-stop" type="button" hidden>Stop</button>
-      <img id="lightboxImage" alt="" />
       <div id="lightboxTools" class="lightbox-tools" hidden></div>
     </dialog>
 

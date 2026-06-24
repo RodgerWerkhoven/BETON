@@ -1216,6 +1216,31 @@ function commentValue(review) {
   return "";
 }
 
+function lastCommentPreview(commentStr) {
+  if (!commentStr) return "";
+  const lines = commentStr.split(/\r?\n/).filter(l => l.trim());
+  if (!lines.length) return "";
+  const lastLine = lines[lines.length - 1];
+  
+  let prefix = "";
+  let content = lastLine;
+  const match = lastLine.match(/^([RVBA]:)\s*(.*)/);
+  if (match) {
+    prefix = match[1] + " ";
+    content = match[2];
+  }
+  
+  const sentenceMatch = content.match(/^[^.!?]+[.!?]/);
+  let sentence = sentenceMatch ? sentenceMatch[0] : content;
+  
+  const maxLen = 26;
+  if (sentence.length > maxLen) {
+    sentence = sentence.substring(0, maxLen).trim() + "..";
+  }
+  
+  return prefix + sentence;
+}
+
 function renderCommentsList(review) {
   if (!review || !review.comment) return "";
   const lines = review.comment.split(/\r?\n/).filter(l => l.trim());
@@ -1278,6 +1303,10 @@ function updateCommentFromControl(control) {
     const commentsList = card.querySelector(`.comments-list[data-id="${logo.id}"], .comments-list`);
     if (commentsList) {
       commentsList.innerHTML = renderCommentsList(review);
+    }
+    const previewEl = card.querySelector(".comment-preview-text");
+    if (previewEl) {
+      previewEl.textContent = lastCommentPreview(review.comment);
     }
   }
   
@@ -1440,13 +1469,14 @@ function render() {
             </div>
             <div class="comment-row">
               <button class="comment-toggle" type="button" data-action="comment-toggle" data-id="${logo.id}">💬</button>
-              <div class="comment ${review.commentOpen || review.comment ? "is-open" : ""}">
-                <div class="comments-list" data-id="${logo.id}">
-                  ${renderCommentsList(review)}
-                </div>
-                <textarea data-action="comment" data-id="${logo.id}" rows="1" placeholder="${currentCommentPrefix()} ${escapeHtml(t("writeComment"))}">${escapeHtml(commentValue(review))}</textarea>
-              </div>
+              <div class="comment-preview-text">${escapeHtml(lastCommentPreview(review.comment))}</div>
               <button class="panel-toggle" type="button" data-action="toggle-extras" data-id="${logo.id}" aria-label="Details">${review.extrasOpen ? "⇣" : "⇡"}</button>
+            </div>
+            <div class="comment-drawer ${review.commentOpen || review.comment ? "is-open" : ""}">
+              <div class="comments-list" data-id="${logo.id}">
+                ${renderCommentsList(review)}
+              </div>
+              <textarea data-action="comment" data-id="${logo.id}" rows="1" placeholder="${currentCommentPrefix()} ${escapeHtml(t("writeComment"))}">${escapeHtml(commentValue(review))}</textarea>
             </div>
           </div>
         </article>

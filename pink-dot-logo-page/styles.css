@@ -1141,7 +1141,9 @@ main {
   display: grid;
   place-items: center;
   min-width: 0;
+  width: 44px;
   height: 44px;
+  aspect-ratio: 1;
   padding: 6px;
   font-size: 21px;
   line-height: 1;
@@ -1150,25 +1152,44 @@ main {
 .comment-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 12px;
   width: 100%;
 }
 
-.comment {
-  display: none;
+.comment-preview-text {
   flex: 1;
-  min-width: 0;
-  gap: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
 }
 
-.comment.is-open {
-  display: grid;
+.comment-drawer {
+  display: none;
+  width: 100%;
+  margin-top: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.comment-drawer.is-open {
+  display: flex;
 }
 
 .comment-toggle {
-  justify-self: start;
-  min-width: 46px;
-  padding: 8px 10px;
+  width: 44px;
+  height: 44px;
+  aspect-ratio: 1;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  flex: 0 0 44px;
 }
 
 .comment span {
@@ -2234,9 +2255,9 @@ main {
   bottom: 0;
   left: 0;
   right: 0;
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-top: 1px solid var(--line);
   padding: 10px 12px;
   z-index: 3;
@@ -2281,6 +2302,21 @@ main {
   gap: 5px;
   margin-bottom: 6px;
   padding-right: 4px;
+}
+
+.comments-list::-webkit-scrollbar {
+  width: 6px;
+}
+.comments-list::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
+}
+.comments-list::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+.comments-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
 }
 
 .comment-bubble {

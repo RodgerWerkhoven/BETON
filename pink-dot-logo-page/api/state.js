@@ -102,11 +102,19 @@ async function findSuffixedPath(path) {
 
 async function deleteAssetBlob(pathname) {
   if (!pathname) return false;
-  const paths = [pathname];
-  const suffixedPath = await findSuffixedPath(pathname);
-  if (suffixedPath && !paths.includes(suffixedPath)) paths.push(suffixedPath);
-  await del(paths);
-  return true;
+  // Blob cleanup is best-effort: a missing/renamed/mismatched blob (common for
+  // older assets) must never block removing the asset from state. Swallow any
+  // error here and let the caller proceed with the idempotent state cleanup.
+  try {
+    const paths = [pathname];
+    const suffixedPath = await findSuffixedPath(pathname);
+    if (suffixedPath && !paths.includes(suffixedPath)) paths.push(suffixedPath);
+    await del(paths);
+    return true;
+  } catch (error) {
+    console.warn(`Blob cleanup failed for "${pathname}":`, error?.message || error);
+    return false;
+  }
 }
 
 module.exports = async function handler(req, res) {
@@ -141,10 +149,14 @@ module.exports = async function handler(req, res) {
       if (!assetId) return res.status(400).json({ error: "Asset ontbreekt" });
       const state = await loadState(projectId);
       const item = state.addedItems[assetId];
-      if (!item) return res.status(404).json({ error: "Asset niet gevonden" });
 
-      const blobPathname = item.blobPathname || "";
+      // Best-effort blob cleanup. Even if the asset is already gone from state,
+      // proceed so stale cards can always be cleared idempotently.
+      const blobPathname = (item && item.blobPathname) || "";
       const blobDeleted = await deleteAssetBlob(blobPathname);
+
+      // Always remove the asset from state, regardless of whether the blob
+      // existed. This is what actually clears the card on the board.
       delete state.addedItems[assetId];
       delete state.review[assetId];
       delete state.crops[assetId];

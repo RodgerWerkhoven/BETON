@@ -3791,6 +3791,7 @@ function setActiveFilter(filter) {
   render();
 }
 
+let filterClickTimer = null;
 controls.addEventListener("click", (event) => {
   const del = event.target.closest('[data-action="delete-tag"]');
   if (del) {
@@ -3799,8 +3800,81 @@ controls.addEventListener("click", (event) => {
   }
   const button = event.target.closest(".filter");
   if (!button) return;
-  setActiveFilter(button.dataset.filter);
+  const filter = button.dataset.filter;
+  // "TAGS" filters immediately; real tags wait briefly so a double-click (rename)
+  // can cancel the single-click filter action.
+  if (filter === "all") {
+    setActiveFilter(filter);
+    return;
+  }
+  clearTimeout(filterClickTimer);
+  filterClickTimer = setTimeout(() => setActiveFilter(filter), 220);
 });
+
+controls.addEventListener("dblclick", (event) => {
+  const button = event.target.closest(".filter");
+  if (!button || button.dataset.filter === "all") return;
+  clearTimeout(filterClickTimer);
+  event.preventDefault();
+  startTagRename(button);
+});
+
+// Inline-rename a tag straight in the filter bar (double-click → editable field).
+function startTagRename(filterButton) {
+  const oldTag = filterButton.dataset.filter;
+  if (!oldTag || oldTag === "all") return;
+  const chip = filterButton.closest(".filter-chip") || filterButton.parentElement;
+  if (!chip || chip.querySelector(".filter-edit")) return;
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "filter-edit";
+  input.value = normalizeTag(oldTag);
+  input.size = Math.max(4, input.value.length + 1);
+  filterButton.style.display = "none";
+  const delBtn = chip.querySelector(".filter-delete");
+  if (delBtn) delBtn.style.display = "none";
+  chip.appendChild(input);
+  input.focus();
+  input.select();
+  let done = false;
+  const finish = (commit) => {
+    if (done) return;
+    done = true;
+    if (commit && normalizeTag(input.value) && normalizeTag(input.value) !== normalizeTag(oldTag)) {
+      renameTagGlobally(oldTag, input.value);
+    } else {
+      render();
+    }
+  };
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); finish(true); }
+    else if (e.key === "Escape") { e.preventDefault(); finish(false); }
+  });
+  input.addEventListener("blur", () => finish(true));
+}
+
+// Rename a tag on EVERY asset that carries it (merges if the new name already exists).
+function renameTagGlobally(oldTag, newTag) {
+  const oldN = normalizeTag(oldTag);
+  const newN = normalizeTag(newTag);
+  if (!oldN || !newN || oldN === newN) { render(); return; }
+  const reviewPatch = {};
+  allLogos().forEach((logo) => {
+    const key = logoStateKey(logo);
+    const review = reviewState[key] || logoReview(logo);
+    const existing = visibleTagsFor(logo, review);
+    if (!existing.includes(oldN)) return;
+    review.customTags = uniqueTags(existing.map((tt) => (tt === oldN ? newN : tt)));
+    reviewState[key] = review;
+    reviewPatch[key] = reviewState[key] || null;
+  });
+  if (Object.keys(reviewPatch).length > 0) {
+    writeJson(reviewStoreKey, reviewState);
+    schedulePersist({ review: reviewPatch });
+  }
+  if (activeFilter === oldN) activeFilter = newN;
+  render();
+}
 
 // Remove a tag from EVERY asset (mirrors batchRemoveTag, but for the whole board).
 function deleteTagGlobally(tag) {

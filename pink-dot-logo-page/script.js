@@ -1217,7 +1217,10 @@ function allTagFilters() {
 
 function renderFilters() {
   const tagButtons = allTagFilters().map((tag) => (
-    `<button class="filter ${activeFilter === tag ? "active" : ""}" data-filter="${escapeHtml(tag)}">${escapeHtml(tagLabel(tag))}</button>`
+    `<span class="filter-chip">
+      <button class="filter ${activeFilter === tag ? "active" : ""}" data-filter="${escapeHtml(tag)}">${escapeHtml(tagLabel(tag))}</button>
+      <button class="filter-delete" type="button" data-action="delete-tag" data-tag="${escapeHtml(tag)}" aria-label="Tag ${escapeHtml(tagLabel(tag))} verwijderen">⊖</button>
+    </span>`
   ));
   controls.innerHTML = `<button class="filter ${activeFilter === "all" ? "active" : ""}" data-filter="all">${escapeHtml(t("tags"))}</button>${tagButtons.join("")}`;
   addedFilter.classList.toggle("active", activeFilter === "TOEGEVOEGD");
@@ -3789,10 +3792,43 @@ function setActiveFilter(filter) {
 }
 
 controls.addEventListener("click", (event) => {
+  const del = event.target.closest('[data-action="delete-tag"]');
+  if (del) {
+    deleteTagGlobally(del.dataset.tag);
+    return;
+  }
   const button = event.target.closest(".filter");
   if (!button) return;
   setActiveFilter(button.dataset.filter);
 });
+
+// Remove a tag from EVERY asset (mirrors batchRemoveTag, but for the whole board).
+function deleteTagGlobally(tag) {
+  const norm = normalizeTag(tag);
+  if (!norm) return;
+  const message = activeLanguage === "nl"
+    ? `Tag "${tagLabel(norm)}" van ALLE assets verwijderen?`
+    : `Remove tag "${tagLabel(norm)}" from ALL assets?`;
+  if (!window.confirm(message)) return;
+  const reviewPatch = {};
+  allLogos().forEach((logo) => {
+    const key = logoStateKey(logo);
+    const review = reviewState[key] || logoReview(logo);
+    const existing = visibleTagsFor(logo, review);
+    if (!existing.includes(norm)) return;
+    const next = existing.filter((tt) => tt !== norm);
+    if (next.length > 0) review.customTags = next;
+    else delete review.customTags;
+    reviewState[key] = review;
+    reviewPatch[key] = reviewState[key] || null;
+  });
+  if (Object.keys(reviewPatch).length > 0) {
+    writeJson(reviewStoreKey, reviewState);
+    schedulePersist({ review: reviewPatch });
+  }
+  if (activeFilter === norm) activeFilter = "all";
+  render();
+}
 
 [addedFilter, deletedFilter].forEach((button) => {
   button.addEventListener("click", () => {

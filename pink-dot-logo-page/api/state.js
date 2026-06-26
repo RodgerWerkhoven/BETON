@@ -174,24 +174,25 @@ module.exports = async function handler(req, res) {
 
     if (req.method === "DELETE") {
       if (session.role === "guest") return res.status(403).json({ error: "Gast mag niet verwijderen" });
-      const assetId = requestedAsset(req);
-      if (!assetId) return res.status(400).json({ error: "Asset ontbreekt" });
+      // Accept one OR many (comma-separated) asset ids and remove them all in a
+      // SINGLE load-modify-save. Deleting in parallel used to race: each request
+      // loaded the whole state, removed only its own asset and saved, so the last
+      // write won and the other deletions came back. One save fixes that.
+      const assetIds = requestedAsset(req).split(",").map((s) => s.trim()).filter(Boolean);
+      if (!assetIds.length) return res.status(400).json({ error: "Asset ontbreekt" });
       const state = await loadState(projectId);
-      const item = state.addedItems[assetId];
-
-      // Best-effort blob cleanup. Even if the asset is already gone from state,
-      // proceed so stale cards can always be cleared idempotently.
-      const blobPathname = (item && item.blobPathname) || "";
-      const blobDeleted = await deleteAssetBlob(blobPathname);
-
-      // Always remove the asset from state, regardless of whether the blob
-      // existed. This is what actually clears the card on the board.
-      delete state.addedItems[assetId];
-      delete state.review[assetId];
-      delete state.crops[assetId];
-      delete state.cropHistory[assetId];
+      let blobDeleted = 0;
+      for (const assetId of assetIds) {
+        const item = state.addedItems[assetId];
+        // Best-effort blob cleanup; never let it block the state removal.
+        if (await deleteAssetBlob((item && item.blobPathname) || "")) blobDeleted += 1;
+        delete state.addedItems[assetId];
+        delete state.review[assetId];
+        delete state.crops[assetId];
+        delete state.cropHistory[assetId];
+      }
       await saveState(projectId, state);
-      return res.status(200).json({ deleted: true, asset: assetId, blobDeleted });
+      return res.status(200).json({ deleted: true, assets: assetIds, blobDeleted });
     }
 
     res.setHeader("Allow", "GET, POST, DELETE");

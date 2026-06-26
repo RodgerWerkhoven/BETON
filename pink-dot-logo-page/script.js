@@ -1474,17 +1474,18 @@ async function deleteAddedAsset(logo, key) {
     render();
     return;
   }
-  await persistQueue.catch(() => {});
-  const response = await fetch(`/api/state?project=${encodeURIComponent(activeProjectId)}&asset=${encodeURIComponent(key)}`, {
-    method: "DELETE",
-    headers: {
-      "x-project-id": activeProjectId,
-      "x-asset-id": key
-    }
+  // Chain onto the persist queue so deletes serialize with each other and with
+  // other writes — concurrent load-modify-save on the shared state would race.
+  persistQueue = persistQueue.catch(() => {}).then(async () => {
+    const response = await fetch(`/api/state?project=${encodeURIComponent(activeProjectId)}&asset=${encodeURIComponent(key)}`, {
+      method: "DELETE",
+      headers: { "x-project-id": activeProjectId, "x-asset-id": key }
+    });
+    if (!response.ok) throw new Error(await response.text());
+    removeLocalAddedAsset(key);
+    render();
   });
-  if (!response.ok) throw new Error(await response.text());
-  removeLocalAddedAsset(key);
-  render();
+  return persistQueue;
 }
 
 function pushCropHistory(file) {
@@ -4871,19 +4872,22 @@ async function batchDeleteAssets() {
 
   if (addedIds.length > 0) {
     await persistQueue.catch(() => {});
-    const results = await Promise.allSettled(
-      addedIds.map(async ({ key }) => {
-        const response = await fetch(`/api/state?project=${encodeURIComponent(activeProjectId)}&asset=${encodeURIComponent(key)}`, {
-          method: "DELETE",
-          headers: { "x-project-id": activeProjectId, "x-asset-id": key }
-        });
-        if (!response.ok) throw new Error(await response.text());
-        removeLocalAddedAsset(key);
-      })
-    );
+    const keys = addedIds.map(({ key }) => key);
+    // ONE request removes them all atomically server-side (no parallel save race).
+    let failed = false;
+    try {
+      const response = await fetch(`/api/state?project=${encodeURIComponent(activeProjectId)}&asset=${encodeURIComponent(keys.join(","))}`, {
+        method: "DELETE",
+        headers: { "x-project-id": activeProjectId }
+      });
+      if (!response.ok) throw new Error(await response.text());
+      keys.forEach((key) => removeLocalAddedAsset(key));
+    } catch (error) {
+      failed = true;
+      console.error("Batch delete failed", error);
+    }
     addedIds.forEach(({ id }) => processingAssetIds.delete(id));
-    if (results.some((r) => r.status === "rejected")) {
-      console.error("Batch delete: some assets failed", results.filter((r) => r.status === "rejected"));
+    if (failed) {
       window.alert(
         activeLanguage === "nl"
           ? "Sommige geselecteerde assets konden niet volledig worden verwijderd."

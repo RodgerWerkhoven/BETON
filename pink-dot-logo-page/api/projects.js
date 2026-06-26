@@ -264,6 +264,20 @@ module.exports = async function handler(req, res) {
       return res.status(201).json({ project: publicProject(directory.projects[id], session), notification });
     }
 
+    if (req.method === "PATCH") {
+      const projectId = requestedProject(req);
+      const project = directory.projects[projectId];
+      if (!project) return res.status(404).json({ error: "Project niet gevonden" });
+      if (!canManageProject(project, session)) return res.status(403).json({ error: "Geen rechten om dit project te wijzigen" });
+      const body = await readBody(req);
+      const title = String(body.title || "").trim();
+      if (!title) return res.status(400).json({ error: "Titel ontbreekt" });
+      project.title = title;
+      directory.projects[projectId] = project;
+      await saveDirectory(directory);
+      return res.status(200).json({ project: publicProject(project, session) });
+    }
+
     if (req.method === "DELETE") {
       const projectId = requestedProject(req);
       const project = directory.projects[projectId];
@@ -280,7 +294,7 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ deleted: true, id: projectId });
     }
 
-    res.setHeader("Allow", "GET, POST, DELETE");
+    res.setHeader("Allow", "GET, POST, PATCH, DELETE");
     return res.status(405).json({ error: "Method not allowed" });
   } catch (error) {
     return res.status(500).json({ error: error.message || "Projects API failed" });

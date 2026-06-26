@@ -30,20 +30,73 @@
           <p class="eyebrow">ANÓTHER DIMENSION</p>
           <h1>CONTENT CURATOR</h1>
         </div>
-        <button id="projectLogoutButton" type="button">Uitloggen</button>
+        <div class="project-head-actions">
+          <button id="manualToggle" class="manual-toggle" type="button" aria-expanded="false" aria-controls="curatorGuide" data-i18n="manual">HANDLEIDING</button>
+          <button id="projectLogoutButton" type="button">Uitloggen</button>
+        </div>
       </header>
-      <section class="curator-guide" aria-label="Korte handleiding voor curatoren">
-        <strong data-i18n="guideTitle">Voor curatoren</strong>
-        <ul>
-          <li data-i18n="guideVote">Open een project, bekijk de assets en stem met de emoji's.</li>
-          <li data-i18n="guideSharedVote">Staat er al een kleur in het vakje waarop jij wilt stemmen? Klik gewoon: jouw kleur verschijnt naast die van de ander.</li>
-          <li data-i18n="guideUndoVote">Nogmaals klikken op jouw eigen stem haalt alleen jouw stem weg.</li>
-          <li data-i18n="guideFilter">Klik op tags of kleurcirkels om de selectie te filteren.</li>
-          <li data-i18n="guideCrop">🪚 snijdt een image bij.</li>
-          <li data-i18n="guideCut">✂️ knipt een sheet met meerdere beelden in losse assets om apart te beoordelen.</li>
-          <li data-i18n="guideCapture">📸 laat je zelf een zwart kader om 1 beeld trekken; dat beeld komt als los asset naast de sheet te staan.</li>
-          <li data-i18n="guideMultiSelect">Desktop: COMMAND + muisklik om meerdere assets te selecteren. iOS/mobiel: Ingedrukt houden om selectie-modus te starten.</li>
-        </ul>
+      <section class="curator-guide" id="curatorGuide" aria-label="Handleiding" hidden>
+        <h2 class="guide-heading" data-i18n="manual">HANDLEIDING</h2>
+        <div class="guide-grid">
+          <div class="guide-group">
+            <h3 data-i18n="guideSecVote">Stemmen</h3>
+            <ul>
+              <li data-i18n="guideVote">Open een project en stem op elk beeld met de emoji's 🤩 🙂 🆗 🤔 🤮. Eén klik = jouw stem, en die blijft staan.</li>
+              <li data-i18n="guideSharedVote">Staat er al een kleur in het vakje waarop jij wilt stemmen? Klik gewoon: jouw kleur komt ernaast.</li>
+              <li data-i18n="guideUndoVote">Nogmaals op je eigen stem klikken haalt alleen jóuw stem weg. Je kunt nooit andermans stem verwijderen.</li>
+            </ul>
+          </div>
+          <div class="guide-group">
+            <h3 data-i18n="guideSecView">Bekijken &amp; filteren</h3>
+            <ul>
+              <li data-i18n="guideLightbox">Klik een beeld om het groot te bekijken; blader met ⬅️ ➡️ en zoom in/uit.</li>
+              <li data-i18n="guideFilter">Filter op #tags of op de kleur-cirkels (per stemmer).</li>
+              <li data-i18n="guideSort">Sorteer met VOLGORDE: populairste, nieuwste, upload-volgorde of grootte.</li>
+            </ul>
+          </div>
+          <div class="guide-group">
+            <h3 data-i18n="guideSecChat">Opmerkingen</h3>
+            <ul>
+              <li data-i18n="guideChatOpen">Naast 💬 staat de eerste regel van het laatste bericht. Klik ⇣ om de chat naar beneden uit te klappen.</li>
+              <li data-i18n="guideChatType">Typ je opmerking naast je initiaal (R: / V: / B:). Enter = een nieuw los berichtje.</li>
+              <li data-i18n="guideChatDelete">Met ⊖ wis je een los bericht.</li>
+            </ul>
+          </div>
+          <div class="guide-group">
+            <h3 data-i18n="guideSecTags">Tags</h3>
+            <ul>
+              <li data-i18n="guideTagFilter">Klik een tag om op die tag te filteren.</li>
+              <li data-i18n="guideTagDelete">⊖ naast een tag verwijdert die tag van álle beelden.</li>
+              <li data-i18n="guideTagRename">Dubbelklik een tag om 'm overal te hernoemen.</li>
+            </ul>
+          </div>
+          <div class="guide-group">
+            <h3 data-i18n="guideSecEdit">Bewerken per beeld</h3>
+            <ul>
+              <li data-i18n="guideCrop">🪚 snijdt een beeld bij.</li>
+              <li data-i18n="guideCapture">📸 laat je een kader om één beeld trekken; dat komt als los asset erbij.</li>
+              <li data-i18n="guideCut">✂️ knipt een sheet met meerdere beelden in losse assets.</li>
+              <li data-i18n="guideUndo">↩️ maakt een bijsnijding ongedaan.</li>
+              <li data-i18n="guideDelete">☠️ verwijdert het beeld.</li>
+            </ul>
+          </div>
+          <div class="guide-group">
+            <h3 data-i18n="guideSecAdd">Toevoegen &amp; meerdere tegelijk</h3>
+            <ul>
+              <li data-i18n="guideAdd">VOEG ASSET TOE: upload beeld, video, audio of een sheet (typ eerst een uitleg).</li>
+              <li data-i18n="guideMultiSelect">Desktop: CMD + klik om meerdere te selecteren. Mobiel: ingedrukt houden.</li>
+              <li data-i18n="guideBatch">Batch: tag toevoegen (#tag), tag verwijderen, of verwijderen (☠️).</li>
+            </ul>
+          </div>
+          <div class="guide-group">
+            <h3 data-i18n="guideSecShare">Delen &amp; project</h3>
+            <ul>
+              <li data-i18n="guideShare">🚀 kopieert een link naar je huidige #tag-selectie (of het hele project). Wie 'm opent kan meteen stemmen zónder login; inloggen geeft de rest.</li>
+              <li data-i18n="guideRename">"Naam wijzigen" past de projectnaam overal aan — ook hier op de eerste pagina.</li>
+              <li data-i18n="guideLang">Met 🇳🇱 / 🇬🇧 wissel je de taal.</li>
+            </ul>
+          </div>
+        </div>
       </section>
       <main class="project-main">
         <section class="project-list" id="projectList" aria-label="Projecten"></section>

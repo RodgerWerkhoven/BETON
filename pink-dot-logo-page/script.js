@@ -56,6 +56,8 @@ const aspectButtons = {
   grid: document.querySelector("#aspectGrid"),
   square: document.querySelector("#aspectSquare"),
 };
+const manualToggle = document.querySelector("#manualToggle");
+const curatorGuide = document.querySelector("#curatorGuide");
 const toggleTextEdit = document.querySelector("#toggleTextEdit");
 const saveTextEdit = document.querySelector("#saveTextEdit");
 const resetTextEdit = document.querySelector("#resetTextEdit");
@@ -156,17 +158,40 @@ const translations = {
     reset: "Reset",
     boxesFound: "vakken gevonden.",
     boxes: "vakken.",
-    guideVote: "Open een project, bekijk de assets en stem met de emoji's.",
-    guideSharedVote: "Staat er al een kleur in het vakje waarop jij wilt stemmen? Klik gewoon: jouw kleur verschijnt naast die van de ander.",
-    guideUndoVote: "Nogmaals klikken op jouw eigen stem haalt alleen jouw stem weg.",
-    guideFilter: "Klik op tags of kleurcirkels om de selectie te filteren.",
-    guideCrop: "🪚 snijdt een image bij.",
-    guideCut: "✂️ knipt een sheet met meerdere beelden in losse assets om apart te beoordelen.",
-    guideCapture: "📸 laat je zelf een zwart kader om 1 beeld trekken; dat beeld komt als los asset naast de sheet te staan.",
+    manual: "HANDLEIDING",
+    guideSecVote: "Stemmen",
+    guideVote: "Open een project en stem op elk beeld met de emoji's 🤩 🙂 🆗 🤔 🤮. Eén klik = jouw stem, en die blijft staan.",
+    guideSharedVote: "Staat er al een kleur in het vakje waarop jij wilt stemmen? Klik gewoon: jouw kleur komt ernaast.",
+    guideUndoVote: "Nogmaals op je eigen stem klikken haalt alleen jóuw stem weg. Je kunt nooit andermans stem verwijderen.",
+    guideSecView: "Bekijken & filteren",
+    guideLightbox: "Klik een beeld om het groot te bekijken; blader met ⬅️ ➡️ en zoom in/uit.",
+    guideFilter: "Filter op #tags of op de kleur-cirkels (per stemmer).",
+    guideSort: "Sorteer met VOLGORDE: populairste, nieuwste, upload-volgorde of grootte.",
+    guideSecChat: "Opmerkingen",
+    guideChatOpen: "Naast 💬 staat de eerste regel van het laatste bericht. Klik ⇣ om de chat naar beneden uit te klappen.",
+    guideChatType: "Typ je opmerking naast je initiaal (R: / V: / B:). Enter = een nieuw los berichtje.",
+    guideChatDelete: "Met ⊖ wis je een los bericht.",
+    guideSecTags: "Tags",
+    guideTagFilter: "Klik een tag om op die tag te filteren.",
+    guideTagDelete: "⊖ naast een tag verwijdert die tag van álle beelden.",
+    guideTagRename: "Dubbelklik een tag om 'm overal te hernoemen.",
+    guideSecEdit: "Bewerken per beeld",
+    guideCrop: "🪚 snijdt een beeld bij.",
+    guideCapture: "📸 laat je een kader om één beeld trekken; dat komt als los asset erbij.",
+    guideCut: "✂️ knipt een sheet met meerdere beelden in losse assets.",
+    guideUndo: "↩️ maakt een bijsnijding ongedaan.",
+    guideDelete: "☠️ verwijdert het beeld.",
+    guideSecAdd: "Toevoegen & meerdere tegelijk",
+    guideAdd: "VOEG ASSET TOE: upload beeld, video, audio of een sheet (typ eerst een uitleg).",
+    guideBatch: "Batch: tag toevoegen (#tag), tag verwijderen, of verwijderen (☠️).",
+    guideSecShare: "Delen & project",
+    guideShare: "🚀 kopieert een link naar je huidige #tag-selectie (of het hele project). Wie 'm opent kan meteen stemmen zónder login; inloggen geeft de rest.",
+    guideRename: "‘Naam wijzigen’ past de projectnaam overal aan — ook hier op de eerste pagina.",
+    guideLang: "Met 🇳🇱 / 🇬🇧 wissel je de taal.",
     selected: "geselecteerd",
     batchAddTag: "🏷️ + Tag",
     batchRemoveTag: "🏷️ - Tag",
-    guideMultiSelect: "Desktop: CMD + klik om meerdere assets te selecteren. Mobiel: Ingedrukt houden om selectie-modus te starten. Batch acties: tag toevoegen (#tag typen), tag verwijderen of verwijderen (☠️).",
+    guideMultiSelect: "Desktop: CMD + klik om meerdere te selecteren. Mobiel: ingedrukt houden.",
   },
   en: {
     addAsset: "ADD ASSET",
@@ -231,17 +256,40 @@ const translations = {
     reset: "Reset",
     boxesFound: "boxes found.",
     boxes: "boxes.",
-    guideVote: "Open a project, review the assets and vote with the emoji buttons.",
-    guideSharedVote: "Already a color in the vote box you want? Click anyway: your color appears next to the other one.",
-    guideUndoVote: "Clicking your own vote again removes only your vote.",
-    guideFilter: "Click tags or color circles to filter the selection.",
+    manual: "MANUAL",
+    guideSecVote: "Voting",
+    guideVote: "Open a project and vote on each image with the emoji 🤩 🙂 🆗 🤔 🤮. One click = your vote, and it sticks.",
+    guideSharedVote: "Already a color in the vote box you want? Just click: your color appears next to it.",
+    guideUndoVote: "Clicking your own vote again removes only your vote. You can never remove someone else's vote.",
+    guideSecView: "Viewing & filtering",
+    guideLightbox: "Click an image to view it large; page through with ⬅️ ➡️ and zoom in/out.",
+    guideFilter: "Filter by #tags or by the color circles (per voter).",
+    guideSort: "Sort with ORDER: most popular, newest, upload order, or size.",
+    guideSecChat: "Comments",
+    guideChatOpen: "Next to 💬 you see the first line of the last message. Click ⇣ to open the chat downward.",
+    guideChatType: "Type your note next to your initial (R: / V: / B:). Enter = a new separate message.",
+    guideChatDelete: "Use ⊖ to delete a single message.",
+    guideSecTags: "Tags",
+    guideTagFilter: "Click a tag to filter by it.",
+    guideTagDelete: "⊖ next to a tag removes that tag from ALL images.",
+    guideTagRename: "Double-click a tag to rename it everywhere.",
+    guideSecEdit: "Editing (per image)",
     guideCrop: "🪚 crops an image.",
-    guideCut: "✂️ cuts a sheet with multiple images into separate assets for rating.",
-    guideCapture: "📸 lets you draw a black frame around one image; that image appears as a separate asset next to the sheet.",
+    guideCapture: "📸 lets you draw a frame around one image; it's added as a separate asset.",
+    guideCut: "✂️ cuts a sheet of multiple images into separate assets.",
+    guideUndo: "↩️ undoes a crop.",
+    guideDelete: "☠️ deletes the image.",
+    guideSecAdd: "Adding & multiple at once",
+    guideAdd: "ADD ASSET: upload an image, video, audio, or a sheet (write a note first).",
+    guideBatch: "Batch: add tag (#tag), remove tag, or delete (☠️).",
+    guideSecShare: "Sharing & project",
+    guideShare: "🚀 copies a link to your current #tag selection (or the whole project). Whoever opens it can vote right away without logging in; log in for the rest.",
+    guideRename: "\"Rename\" changes the project name everywhere — including here on the first page.",
+    guideLang: "Switch language with 🇳🇱 / 🇬🇧.",
     selected: "selected",
     batchAddTag: "🏷️ + Tag",
     batchRemoveTag: "🏷️ - Tag",
-    guideMultiSelect: "Desktop: CMD + click to select multiple assets. Mobile: Press and hold to enter select mode. Batch actions: add tag (type #tag), remove tag, or delete (☠️).",
+    guideMultiSelect: "Desktop: CMD + click to select multiple. Mobile: press and hold.",
   },
 };
 const ratingOptions = ["🤩", "🙂", "🆗", "🤔", "🤮"];
@@ -4503,12 +4551,31 @@ captureDialog.addEventListener("close", () => {
   if (!captureSaveButton.disabled) resetCaptureTool(false);
 });
 
+manualToggle?.addEventListener("click", () => {
+  if (!curatorGuide) return;
+  const show = curatorGuide.hidden;
+  curatorGuide.hidden = !show;
+  manualToggle.setAttribute("aria-expanded", String(show));
+});
 toggleTextEdit.addEventListener("click", () => setTextEditMode(true));
 saveTextEdit.addEventListener("click", () => {
   const text = currentTextValues();
   writeJson(currentTextStoreKey(), text);
   schedulePersist({ text });
   setTextEditMode(false);
+  // Also rename the project everywhere (project overview / first page reads the
+  // directory title, not the per-project text state).
+  const newTitle = (text.title || "").trim();
+  if (newTitle && activeProject && activeProject.id && newTitle !== activeProject.title) {
+    activeProject.title = newTitle;
+    const listed = currentProjects.find((p) => p.id === activeProject.id);
+    if (listed) listed.title = newTitle;
+    fetch(`/api/projects?id=${encodeURIComponent(activeProject.id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: newTitle }),
+    }).catch((error) => console.error("Project rename failed", error));
+  }
 });
 resetTextEdit.addEventListener("click", () => {
   localStorage.removeItem(currentTextStoreKey());

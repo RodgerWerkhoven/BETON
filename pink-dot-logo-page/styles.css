@@ -515,6 +515,22 @@ h1 {
   background: var(--accent);
 }
 
+.share-tag {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--dark);
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 22px;
+  line-height: 1;
+  padding: 0;
+}
+
 .top-actions {
   grid-area: actions;
   display: flex;
@@ -2382,7 +2398,8 @@ main {
 }
 
 /* "Process running" overlay: ANÓTHER DIMENSION logo, 50% transparent over the affected image */
-.logo-card.is-processing .media-container::after {
+.logo-card.is-processing .media-container::after,
+.media-container.is-loading::after {
   content: "";
   position: absolute;
   inset: 0;

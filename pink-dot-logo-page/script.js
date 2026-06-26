@@ -15,6 +15,7 @@ const newProjectTitle = document.querySelector("#newProjectTitle");
 const newProjectPassword = document.querySelector("#newProjectPassword");
 const newVoterRows = Array.from(document.querySelectorAll(".new-voter-row"));
 const copyNewProjectLink = document.querySelector("#copyNewProjectLink");
+const shareTagButton = document.querySelector("#shareTagButton");
 const newProjectError = document.querySelector("#newProjectError");
 const voteButtons = document.querySelector("#voteButtons");
 const sheetDialog = document.querySelector("#sheetDialog");
@@ -249,6 +250,7 @@ const sheetBoxPalette = ["#ff1d1d", "#60d46f", "#ff30d6", "#2d9cff"];
 const defaults = Object.fromEntries(editableTextNodes.map((node) => [node.dataset.editKey, node.textContent]));
 const initialParams = new URLSearchParams(window.location.search);
 let activeProjectId = initialParams.get("project") || "Alien";
+let pendingInitialTag = initialParams.get("tag") || "";
 
 let logos = [];
 let cropOverrides = readJson(cropStoreKey, {});
@@ -1512,7 +1514,7 @@ function render() {
         const isSelected = selectedAssetIds.has(String(logo.id));
         return `
         <article class="logo-card ${review.deleted ? "is-deleted" : ""} ${isSelected ? "selected" : ""} ${processingAssetIds.has(String(logo.id)) ? "is-processing" : ""}" data-id="${logo.id}">
-          <div class="media-container">
+          <div class="media-container ${croppable ? "is-loading" : ""}">
             <span class="image-number-badge">${escapeHtml(logoNumberLabel(logo))}</span>
             ${croppable
               ? `<button class="image-button" type="button" data-id="${logo.id}">
@@ -1573,6 +1575,10 @@ function render() {
     )
     .join("")}${showUploadCard ? uploadCardTemplate() : ""}`;
   fitCommentTextareas();
+  // Already-loaded (cached) images shouldn't flash the loading pulse on a re-render.
+  gallery.querySelectorAll(".media-container.is-loading img").forEach((img) => {
+    if (img.complete && img.naturalWidth > 0) img.closest(".media-container")?.classList.remove("is-loading");
+  });
 }
 
 function uploadCardTemplate() {
@@ -3914,6 +3920,23 @@ topAddAssetButton?.addEventListener("click", () => {
   addFileInput.click();
 });
 
+// 🚀 — copy a shareable link to the current project, scoped to the active tag (if any).
+function shareTagLink() {
+  const params = new URLSearchParams({ project: activeProjectId });
+  if (isTagFiltered()) params.set("tag", activeFilter);
+  return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+}
+
+shareTagButton?.addEventListener("click", async () => {
+  const link = shareTagLink();
+  try {
+    await navigator.clipboard.writeText(link);
+    flashCopySuccess(shareTagButton);
+  } catch (error) {
+    window.prompt(activeLanguage === "nl" ? "Kopieer de link:" : "Copy the link:", link);
+  }
+});
+
 languageButtons.forEach((button) => {
   button.addEventListener("click", () => setLanguage(button.dataset.lang));
 });
@@ -4079,6 +4102,15 @@ function imageFallbackHandler(event) {
 
 gallery.addEventListener("error", imageFallbackHandler, true);
 lightboxImage.addEventListener("error", imageFallbackHandler);
+
+// Stop the loading pulse once an image has finished loading (or definitively failed).
+function clearMediaLoading(event) {
+  if (event.target instanceof HTMLImageElement) {
+    event.target.closest(".media-container")?.classList.remove("is-loading");
+  }
+}
+gallery.addEventListener("load", clearMediaLoading, true);
+gallery.addEventListener("error", clearMediaLoading, true);
 
 lightboxDialog.addEventListener("click", (event) => {
   if (event.target === lightboxDialog) closeLightbox();
@@ -4543,6 +4575,11 @@ async function startApp() {
   }
   await loadSharedState();
   setProjectTitleFallback();
+  // Open a shared "🚀" link straight into its tag selection.
+  if (pendingInitialTag) {
+    activeFilter = normalizeTag(pendingInitialTag);
+    pendingInitialTag = "";
+  }
   render();
   startRealtimeVoteSync();
 }

@@ -126,6 +126,8 @@ const translations = {
     personalLinkCopied: "Persoonlijke link gekopieerd.",
     projectLinkCopied: "Projectlink gekopieerd.",
     projectLinkFailed: "Projectlink kopiëren mislukte.",
+    linkCopied: "De link is naar je klembord gestuurd.",
+    linkCopyManual: "Kopieer de link:",
     projectDeleteLabel: "Project verwijderen",
     projectDeleteConfirm: "Project verwijderen?",
     projectDeleteFailed: "Project kon niet worden verwijderd.",
@@ -198,6 +200,8 @@ const translations = {
     personalLinkCopied: "Personal link copied.",
     projectLinkCopied: "Project link copied.",
     projectLinkFailed: "Could not copy project link.",
+    linkCopied: "The link has been copied to your clipboard.",
+    linkCopyManual: "Copy the link:",
     projectDeleteLabel: "Delete project",
     projectDeleteConfirm: "Delete project?",
     projectDeleteFailed: "Project could not be deleted.",
@@ -3927,14 +3931,43 @@ function shareTagLink() {
   return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
 }
 
+function showToast(message) {
+  let el = document.getElementById("toast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "toast";
+    el.className = "toast";
+    el.setAttribute("role", "status");
+    document.body.appendChild(el);
+  }
+  el.textContent = message;
+  el.classList.add("is-visible");
+  clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(() => el.classList.remove("is-visible"), 2600);
+}
+
 shareTagButton?.addEventListener("click", async () => {
   const link = shareTagLink();
+  // Pulse the logo over the images this link points to, while it's being generated.
+  const cards = [...gallery.querySelectorAll(".logo-card")];
+  cards.forEach((c) => c.classList.add("is-processing"));
+  let copied = false;
   try {
     await navigator.clipboard.writeText(link);
-    flashCopySuccess(shareTagButton);
+    copied = true;
   } catch (error) {
-    window.prompt(activeLanguage === "nl" ? "Kopieer de link:" : "Copy the link:", link);
+    copied = false;
   }
+  setTimeout(() => {
+    cards.forEach((c) => c.classList.remove("is-processing"));
+    if (copied) {
+      shareTagButton.classList.add("copy-success");
+      setTimeout(() => shareTagButton.classList.remove("copy-success"), 1200);
+      showToast(t("linkCopied"));
+    } else {
+      window.prompt(t("linkCopyManual"), link);
+    }
+  }, 650);
 });
 
 languageButtons.forEach((button) => {

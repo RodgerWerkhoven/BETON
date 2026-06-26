@@ -515,12 +515,14 @@ h1 {
   background: var(--accent);
 }
 
-.share-tag {
+/* High specificity to beat .top-actions-layer > button (which would make it pink + 142px wide). */
+.top-actions-layer > button.share-tag {
   display: grid;
   place-items: center;
-  flex: 0 0 auto;
+  flex: 0 0 44px;
   width: 44px;
   height: 44px;
+  min-height: 44px;
   border: 1px solid var(--dark);
   border-radius: 8px;
   background: #ffffff;
@@ -529,6 +531,35 @@ h1 {
   font-size: 22px;
   line-height: 1;
   padding: 0;
+}
+
+/* Brief pink confirmation after the link is copied, then back to white. */
+.top-actions-layer > button.share-tag.copy-success {
+  background: var(--accent);
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%) translateY(16px);
+  z-index: 9999;
+  max-width: min(92vw, 420px);
+  padding: 12px 20px;
+  border-radius: 8px;
+  background: var(--dark);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 800;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.toast.is-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
 
 .top-actions {

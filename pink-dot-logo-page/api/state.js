@@ -141,6 +141,26 @@ module.exports = async function handler(req, res) {
     if (req.method === "POST") {
       const patch = await readBody(req);
       const state = await loadState(projectId);
+      if (session.role === "guest") {
+        // Guests may ONLY cast their own votes (voter keys starting with "guest")
+        // and register their own guest colour. Everything else is ignored.
+        const safeVotes = {};
+        Object.entries(patch.voteUpdates || {}).forEach(([assetKey, votes]) => {
+          const own = {};
+          Object.entries(votes || {}).forEach(([voterKey, rating]) => {
+            if (String(voterKey).startsWith("guest")) own[voterKey] = rating;
+          });
+          if (Object.keys(own).length) safeVotes[assetKey] = own;
+        });
+        mergeVoteUpdates(state.review, safeVotes);
+        const safeVoters = {};
+        Object.entries(patch.voters || {}).forEach(([key, value]) => {
+          if (String(key).startsWith("guest")) safeVoters[key] = value;
+        });
+        mergeMap(state.voters, safeVoters);
+        await saveState(projectId, state);
+        return res.status(200).json(state);
+      }
       mergeMap(state.crops, patch.crops);
       mergeMap(state.cropHistory, patch.cropHistory);
       mergeMap(state.review, patch.review);
@@ -153,6 +173,7 @@ module.exports = async function handler(req, res) {
     }
 
     if (req.method === "DELETE") {
+      if (session.role === "guest") return res.status(403).json({ error: "Gast mag niet verwijderen" });
       const assetId = requestedAsset(req);
       if (!assetId) return res.status(400).json({ error: "Asset ontbreekt" });
       const state = await loadState(projectId);

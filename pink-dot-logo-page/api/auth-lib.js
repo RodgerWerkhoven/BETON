@@ -109,8 +109,16 @@ function projectsForUser(directory, session) {
 
 function canAccessProject(directory, session, projectId) {
   if (session.role === "admin") return Boolean(directory.projects[projectId]);
+  // A guest (no login, opened a share link) may only reach its own scoped project.
+  if (session.role === "guest") return session.client === `guest:${projectId}` && Boolean(directory.projects[projectId]);
   const project = directory.projects[projectId];
   return Boolean(project && ensureRodgerMembership(project).members.includes(session.client));
+}
+
+// Extract the project a guest session is scoped to (client is "guest:<projectId>").
+function guestProject(session) {
+  if (!session || session.role !== "guest") return "";
+  return session.client.startsWith("guest:") ? session.client.slice("guest:".length) : "";
 }
 
 function canManageProject(project, session) {
@@ -172,4 +180,5 @@ module.exports = {
   projectsForUser,
   canAccessProject,
   canManageProject,
+  guestProject,
 };

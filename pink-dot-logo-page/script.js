@@ -6,6 +6,7 @@ const loginName = document.querySelector("#loginName");
 const loginPassword = document.querySelector("#loginPassword");
 const loginError = document.querySelector("#loginError");
 const logoutButton = document.querySelector("#logoutButton");
+const guestLoginButton = document.querySelector("#guestLoginButton");
 const projectLogoutButton = document.querySelector("#projectLogoutButton");
 const projectOverviewButton = document.querySelector("#projectOverviewButton");
 const projectList = document.querySelector("#projectList");
@@ -105,6 +106,7 @@ const translations = {
     sortSizeDesc: "OP SIZE VAN GROOT NAAR KLEIN",
     projects: "Projecten",
     logout: "Uitloggen",
+    login: "Inloggen",
     loginName: "Naam",
     loginPassword: "Wachtwoord",
     loginButton: "Login",
@@ -179,6 +181,7 @@ const translations = {
     sortSizeDesc: "SIZE LARGE TO SMALL",
     projects: "Projects",
     logout: "Log out",
+    login: "Log in",
     loginName: "Name",
     loginPassword: "Password",
     loginButton: "Log in",
@@ -998,7 +1001,19 @@ function logoReview(logo) {
   return reviewState[logoStateKey(logo)] || {};
 }
 
+function guestVoterKey() {
+  let key = "";
+  try { key = localStorage.getItem("beton-guest-voter") || ""; } catch (e) { key = ""; }
+  if (!key) {
+    key = `guest-${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36).slice(-4)}`;
+    try { localStorage.setItem("beton-guest-voter", key); } catch (e) { /* ignore */ }
+  }
+  return key;
+}
+
 function currentVoterKey() {
+  // Guests vote under their own per-browser key so the server can scope them.
+  if (currentSession?.role === "guest") return guestVoterKey();
   return currentSession?.client || "unknown";
 }
 
@@ -3831,6 +3846,7 @@ controls.addEventListener("dblclick", (event) => {
 
 // Inline-rename a tag straight in the filter bar (double-click → editable field).
 function startTagRename(filterButton) {
+  if (currentSession?.role === "guest") return;
   const oldTag = filterButton.dataset.filter;
   if (!oldTag || oldTag === "all") return;
   const chip = filterButton.closest(".filter-chip") || filterButton.parentElement;
@@ -3888,6 +3904,7 @@ function renameTagGlobally(oldTag, newTag) {
 
 // Remove a tag from EVERY asset (mirrors batchRemoveTag, but for the whole board).
 function deleteTagGlobally(tag) {
+  if (currentSession?.role === "guest") return;
   const norm = normalizeTag(tag);
   if (!norm) return;
   const message = activeLanguage === "nl"
@@ -4631,6 +4648,7 @@ loginForm.addEventListener("submit", async (event) => {
   }
   currentSession = await response.json();
   loginPassword.value = "";
+  document.body.classList.remove("is-guest");
   await showProjectOverview();
 });
 
@@ -4640,10 +4658,12 @@ async function logout() {
   currentSession = null;
   currentProjects = [];
   activeProject = null;
+  document.body.classList.remove("is-guest");
   showLogin("");
 }
 
 logoutButton.addEventListener("click", logout);
+guestLoginButton?.addEventListener("click", () => showLogin(""));
 projectLogoutButton.addEventListener("click", logout);
 projectOverviewButton.addEventListener("click", returnToProjectOverview);
 
@@ -4911,12 +4931,47 @@ gallery.addEventListener("pointermove", handlePointerMove, true);
 
 applyTranslations();
 
+// Enter a project in guest (vote-only) mode — no project list, restricted UI.
+async function enterGuestProject(projectId) {
+  if (!projectId) { showLogin(""); return; }
+  document.body.classList.add("is-guest");
+  activeProjectId = projectId;
+  activeProject = { id: projectId, title: "", baseAssets: projectId === "Alien", canManage: false };
+  await startApp();
+}
+
+// Request a vote-only guest session for a shared 🚀 link (no login needed).
+async function startGuestSession(projectId) {
+  try {
+    const response = await fetch("/api/guest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project: projectId }),
+    });
+    if (!response.ok) return false;
+    currentSession = await response.json();
+    await enterGuestProject(projectId);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
 (async () => {
   const response = await fetch("/api/session", { cache: "no-store" });
-  if (!response.ok) {
-    showLogin("");
+  if (response.ok) {
+    currentSession = await response.json();
+    if (currentSession.role === "guest") {
+      const wanted = initialParams.get("project");
+      if (wanted && wanted !== currentSession.project && await startGuestSession(wanted)) return;
+      await enterGuestProject(currentSession.project || wanted);
+      return;
+    }
+    await showProjectOverview();
     return;
   }
-  currentSession = await response.json();
-  await showProjectOverview();
+  // Not logged in: a shared link (?project=...) opens in vote-only guest mode.
+  const shareProject = initialParams.get("project");
+  if (shareProject && await startGuestSession(shareProject)) return;
+  showLogin("");
 })();

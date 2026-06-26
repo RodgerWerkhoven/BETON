@@ -562,6 +562,29 @@ h1 {
   transform: translateX(-50%) translateY(0);
 }
 
+/* Guest (share-link) mode: vote-only. Everything else is hidden until you log in. */
+#guestLoginButton {
+  display: none;
+}
+
+body.is-guest #guestLoginButton {
+  display: inline-flex;
+}
+
+body.is-guest .top-add-asset,
+body.is-guest #projectOverviewButton,
+body.is-guest #logoutButton,
+body.is-guest .share-tag,
+body.is-guest .text-tools,
+body.is-guest .card-functions,
+body.is-guest .card-actions,
+body.is-guest .comment-row,
+body.is-guest .card-messages,
+body.is-guest .tag-edit,
+body.is-guest .filter-delete {
+  display: none !important;
+}
+
 .top-actions {
   grid-area: actions;
   display: flex;

@@ -53,7 +53,11 @@ module.exports = async function handler(req, res) {
     res.statusCode = contentRange ? 206 : 200;
     res.setHeader("Content-Type", contentType);
     res.setHeader("Accept-Ranges", acceptRanges);
-    res.setHeader("Cache-Control", "private, no-store");
+    // Each blob path is unique + immutable per asset, so cache aggressively in the
+    // browser AND the Vercel edge. Previously "no-store" forced a full re-download
+    // of every image on every gallery re-render (each vote/action), leaving cards
+    // blank while they reloaded.
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
     if (contentLength) res.setHeader("Content-Length", contentLength);
     if (contentRange) res.setHeader("Content-Range", contentRange);
     Readable.fromWeb(result.stream).pipe(res);

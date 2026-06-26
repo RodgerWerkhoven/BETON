@@ -1560,7 +1560,7 @@ function render() {
             </div>
             <div class="card-messages ${review.extrasOpen ? "is-open" : ""}">
               <div class="comments-list" data-id="${logo.id}">
-                ${renderCommentsList(review, { newestFirst: true, id: logo.id })}
+                ${renderCommentsList(review, { id: logo.id })}
               </div>
             </div>
           </div>
@@ -3901,7 +3901,10 @@ gallery.addEventListener("click", async (event) => {
       render();
       if (review.extrasOpen) {
         setTimeout(() => {
-          const input = gallery.querySelector(`.compose-input[data-id="${CSS.escape(String(logo.id))}"]`);
+          const id = CSS.escape(String(logo.id));
+          const list = gallery.querySelector(`.comments-list[data-id="${id}"]`);
+          if (list) list.scrollTop = list.scrollHeight;
+          const input = gallery.querySelector(`.compose-input[data-id="${id}"]`);
           if (input) input.focus();
         }, 0);
       }
@@ -4122,7 +4125,10 @@ gallery.addEventListener("keydown", (event) => {
     if (!result) return;
     render();
     setTimeout(() => {
-      const input = gallery.querySelector(`.compose-input[data-id="${CSS.escape(String(result.logo.id))}"]`);
+      const id = CSS.escape(String(result.logo.id));
+      const list = gallery.querySelector(`.comments-list[data-id="${id}"]`);
+      if (list) list.scrollTop = list.scrollHeight;
+      const input = gallery.querySelector(`.compose-input[data-id="${id}"]`);
       if (input) input.focus();
     }, 0);
   }

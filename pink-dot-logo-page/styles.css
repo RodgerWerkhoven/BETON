@@ -2515,6 +2515,27 @@ main {
   50% { opacity: 0.95; }
 }
 
+/* A card whose real media could not be loaded (e.g. a deleted/missing blob). The
+   brand logo still shows as a placeholder, but this badge makes the gap obvious
+   instead of letting it masquerade as an intentional asset. */
+.media-container.media-missing.is-loading::after,
+.media-container.media-missing::after {
+  content: "⚠ beeld ontbreekt";
+  position: absolute;
+  inset: auto auto 8px 8px;
+  z-index: 7;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #9d1111;
+  background-image: none;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.02em;
+  animation: none;
+  pointer-events: none;
+}
+
 @media (max-width: 768px) {
   .media-container {
     height: auto;

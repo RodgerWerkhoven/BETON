@@ -4195,7 +4195,11 @@ function imageFallbackHandler(event) {
   const image = event.target;
   if (!(image instanceof HTMLImageElement)) return;
   const fallback = image.dataset.fallback;
-  if (!fallback || image.src.endsWith(fallback)) return;
+  if (!fallback) return;
+  // The real media failed to load (e.g. a missing blob → 404). Flag the card so a
+  // gone image is visibly marked instead of silently showing the brand logo.
+  image.closest(".media-container")?.classList.add("media-missing");
+  if (image.src.endsWith(fallback)) return;
   image.src = fallback;
 }
 

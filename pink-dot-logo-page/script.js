@@ -296,6 +296,11 @@ const latestRatingRequest = new Map();
 let realtimeVoteTimer = null;
 let realtimeVoteInFlight = false;
 let realtimeVoteHoldUntil = 0;
+// My own just-cast votes, protected from being clobbered by server syncs until the server confirms them.
+// Keyed by asset; value = { voterKey, rating: string|null }. Only ever holds the CURRENT voter's own vote.
+let pendingVotes = {};
+// Assets that currently have a background process running (e.g. delete) — shows the processing overlay.
+const processingAssetIds = new Set();
 
 function showLogin(message = "") {
   loginView.hidden = false;
@@ -501,15 +506,60 @@ function holdRealtimeVoteSync(duration = 2600) {
   realtimeVoteHoldUntil = Math.max(realtimeVoteHoldUntil, Date.now() + duration);
 }
 
+// One click = one vote: instant, sticky, and only ever touches the current voter's own vote.
+async function castVote(action) {
+  const logo = findLogo(action.dataset.id);
+  if (!logo) return;
+  const key = logoStateKey(logo);
+  const review = logoReview(logo);
+  holdRealtimeVoteSync();
+  const voterKey = currentVoterKey();
+  const voterRegistration = ensureCurrentVoterRegistered({ persist: false });
+  const rating = action.dataset.rating;
+  const votes = { ...votesFor(review) };
+  const shouldRemove = action.dataset.currentVoted === "true" || votes[voterKey] === rating;
+  if (shouldRemove) delete votes[voterKey];
+  else votes[voterKey] = rating;
+  const updated = { ...review, votes };
+  delete updated.rating;
+  delete updated.ratings;
+  reviewState[key] = updated;
+  // Protect my own vote from server syncs until the server confirms it (prevents flicker / re-voting).
+  pendingVotes[key] = { voterKey, rating: shouldRemove ? null : rating };
+  writeJson(reviewStoreKey, reviewState);
+  render();
+  if (lightboxDialog.open) renderLightboxTools(logo);
+  const patch = { voteUpdates: { [key]: { [voterKey]: shouldRemove ? null : rating } } };
+  if (voterRegistration.changed && voterRegistration.color) patch.voters = { [voterKey]: voterRegistration.color };
+  try {
+    await queuePersist(patch);
+  } catch (error) {
+    schedulePersist(patch);
+  }
+}
+
 function voteSignature(votes) {
   return JSON.stringify(Object.fromEntries(Object.entries(votes || {}).sort(([a], [b]) => a.localeCompare(b))));
 }
 
 function mergeRealtimeVotes(remoteReview = {}, remoteVoters = {}) {
   let changed = false;
-  const keys = new Set([...Object.keys(reviewState), ...Object.keys(remoteReview)]);
+  const keys = new Set([...Object.keys(reviewState), ...Object.keys(remoteReview), ...Object.keys(pendingVotes)]);
   keys.forEach((key) => {
-    const remoteVotes = votesFor(remoteReview[key] || {});
+    let remoteVotes = votesFor(remoteReview[key] || {});
+    const pending = pendingVotes[key];
+    if (pending) {
+      const serverVal = remoteVotes[pending.voterKey];
+      const confirmed = pending.rating === null ? serverVal === undefined : serverVal === pending.rating;
+      if (confirmed) {
+        delete pendingVotes[key];
+      } else {
+        // Server hasn't caught up yet — keep my own vote visible, never lose it.
+        remoteVotes = { ...remoteVotes };
+        if (pending.rating === null) delete remoteVotes[pending.voterKey];
+        else remoteVotes[pending.voterKey] = pending.rating;
+      }
+    }
     const localReview = reviewState[key] || {};
     const localVotes = votesFor(localReview);
     if (voteSignature(remoteVotes) === voteSignature(localVotes)) return;
@@ -1241,10 +1291,15 @@ function lastCommentPreview(commentStr) {
   return prefix + sentence;
 }
 
-function renderCommentsList(review) {
+function renderCommentsList(review, opts = {}) {
   if (!review || !review.comment) return "";
   const lines = review.comment.split(/\r?\n/).filter(l => l.trim());
-  return lines.map(line => {
+  let entries = lines.map((line, index) => ({ line, index }));
+  if (opts.newestFirst) entries = entries.slice().reverse();
+  const id = opts.id != null ? escapeHtml(String(opts.id)) : "";
+  const delBtn = (index) =>
+    `<button class="comment-delete" type="button" data-action="delete-message" data-id="${id}" data-index="${index}" aria-label="Verwijder bericht">⊖</button>`;
+  return entries.map(({ line, index }) => {
     let voterClass = "";
     let voterName = "";
     let content = line;
@@ -1261,14 +1316,31 @@ function renderCommentsList(review) {
       voterName = "DAVID";
       content = line.substring(2).trim();
     } else {
-      return `<div class="comment-bubble"><span>${escapeHtml(line)}</span></div>`;
+      return `<div class="comment-bubble"><div class="comment-bubble-body"><span>${escapeHtml(line)}</span></div>${delBtn(index)}</div>`;
     }
     if (!content) return "";
     return `<div class="comment-bubble ${voterClass}">
-      <strong>${voterName}</strong>
-      <span>${escapeHtml(content)}</span>
+      <div class="comment-bubble-body">
+        <strong>${voterName}</strong>
+        <span>${escapeHtml(content)}</span>
+      </div>
+      ${delBtn(index)}
     </div>`;
   }).join("");
+}
+
+// Delete a single message line (by its stored index) from an asset's comment thread.
+function deleteCommentMessage(logo, index) {
+  if (!logo) return false;
+  const review = logoReview(logo);
+  const lines = (review.comment || "").split(/\r?\n/).filter(l => l.trim());
+  if (!(index >= 0 && index < lines.length)) return false;
+  lines.splice(index, 1);
+  review.comment = lines.join("\n");
+  const key = logoStateKey(logo);
+  reviewState[key] = review;
+  saveReviewItem(key);
+  return true;
 }
 
 function fitTextarea(textarea) {
@@ -1311,6 +1383,21 @@ function updateCommentFromControl(control) {
   }
   
   fitTextarea(control);
+  saveReviewItem(key);
+  return { logo, review, key };
+}
+
+// Append a single message as its own line (multiple messages per voter allowed).
+function appendComposedMessage(control) {
+  const logo = findLogo(control.dataset.id);
+  if (!logo) return null;
+  const val = control.value.trim();
+  if (!val) return null;
+  const review = logoReview(logo);
+  const line = `${currentCommentPrefix()} ${val}`;
+  review.comment = review.comment ? `${review.comment}\n${line}` : line;
+  const key = logoStateKey(logo);
+  reviewState[key] = review;
   saveReviewItem(key);
   return { logo, review, key };
 }
@@ -1424,27 +1511,14 @@ function render() {
         const croppable = isImageLogo(logo) && !logo.uploading && !logo.uploadError;
         const isSelected = selectedAssetIds.has(String(logo.id));
         return `
-        <article class="logo-card ${review.deleted ? "is-deleted" : ""} ${isSelected ? "selected" : ""}" data-id="${logo.id}">
+        <article class="logo-card ${review.deleted ? "is-deleted" : ""} ${isSelected ? "selected" : ""} ${processingAssetIds.has(String(logo.id)) ? "is-processing" : ""}" data-id="${logo.id}">
           <div class="media-container">
+            <span class="image-number-badge">${escapeHtml(logoNumberLabel(logo))}</span>
             ${croppable
               ? `<button class="image-button" type="button" data-id="${logo.id}">
-                  <img src="${imageSource(logo, { thumbnail: true })}" data-fallback="${imageFallbackSource(logo)}" alt="${safeName}, ${logo.group}" loading="lazy" />
+                  <img src="${imageSource(logo, { thumbnail: true })}" data-fallback="${imageFallbackSource(logo)}" alt="${safeName}, ${logo.group}" loading="lazy" decoding="async" />
                 </button>`
               : renderMediaStage(logo, safeName)}
-            <div class="extras-panel ${review.extrasOpen ? "is-open" : ""}">
-              <div class="meta-row">
-                <span class="number">${escapeHtml(logoNumberLabel(logo))}</span>
-                ${renderTags(logo, review)}
-              </div>
-              <div class="source">${logo.added ? "" : `${logo.sourceIndex}.${logo.dotIndex}: `}${safeSource}</div>
-              <div class="card-actions">
-                ${croppable ? `<button class="edit-logo" type="button" data-id="${logo.id}" aria-label="Bijsnijden" ${editButtonStyle(logo)}>🪚</button>` : ""}
-                ${croppable ? `<button class="capture-logo" type="button" data-action="capture" data-id="${logo.id}" aria-label="Single capture" ${captureButtonStyle(logo)}>📸</button>` : ""}
-                ${croppable && logo.added ? `<button class="sheet-logo" type="button" data-action="sheet-cut" data-id="${logo.id}" aria-label="Sheet cut-up" ${sheetButtonStyle(logo)}>✂️</button>` : ""}
-                <button class="undo-card" type="button" data-action="undo" data-id="${logo.id}" ${cropHistory[logoStateKey(logo)]?.length ? "" : "disabled"}>↩️</button>
-                <button class="delete-logo ${review.deleted ? "is-restore" : ""}" type="button" data-action="delete" data-id="${logo.id}">${review.deleted ? "Herstel" : "☠️"}</button>
-              </div>
-            </div>
           </div>
           <div class="meta">
             <div class="rating" role="group" aria-label="Rating voor image ${logo.id}">
@@ -1467,16 +1541,30 @@ function render() {
               `;
               }).join("")}
             </div>
-            <div class="comment-row">
-              <button class="comment-toggle" type="button" data-action="comment-toggle" data-id="${logo.id}">💬</button>
-              <div class="comment-preview-text">${escapeHtml(lastCommentPreview(review.comment))}</div>
-              <button class="panel-toggle" type="button" data-action="toggle-extras" data-id="${logo.id}" aria-label="Details">${review.extrasOpen ? "⇣" : "⇡"}</button>
-            </div>
-            <div class="comment-drawer ${review.commentOpen || review.comment ? "is-open" : ""}">
-              <div class="comments-list" data-id="${logo.id}">
-                ${renderCommentsList(review)}
+            <div class="card-functions ${review.extrasOpen ? "is-open" : ""}">
+              <div class="card-actions">
+                ${croppable ? `<button class="edit-logo" type="button" data-id="${logo.id}" aria-label="Bijsnijden" ${editButtonStyle(logo)}>🪚</button>` : ""}
+                ${croppable ? `<button class="capture-logo" type="button" data-action="capture" data-id="${logo.id}" aria-label="Single capture" ${captureButtonStyle(logo)}>📸</button>` : ""}
+                ${croppable && logo.added ? `<button class="sheet-logo" type="button" data-action="sheet-cut" data-id="${logo.id}" aria-label="Sheet cut-up" ${sheetButtonStyle(logo)}>✂️</button>` : ""}
+                <button class="undo-card" type="button" data-action="undo" data-id="${logo.id}" ${cropHistory[logoStateKey(logo)]?.length ? "" : "disabled"}>↩️</button>
+                <button class="delete-logo ${review.deleted ? "is-restore" : ""}" type="button" data-action="delete" data-id="${logo.id}">${review.deleted ? "Herstel" : "☠️"}</button>
               </div>
-              <textarea data-action="comment" data-id="${logo.id}" rows="1" placeholder="${currentCommentPrefix()} ${escapeHtml(t("writeComment"))}">${escapeHtml(commentValue(review))}</textarea>
+              <div class="drawer-meta">
+                ${renderTags(logo, review)}
+                <div class="source">${logo.added ? "" : `${logo.sourceIndex}.${logo.dotIndex}: `}${safeSource}</div>
+              </div>
+            </div>
+            <div class="comment-row">
+              <span class="comment-icon" aria-hidden="true">💬</span>
+              ${(review.extrasOpen || !review.comment)
+                ? `<span class="compose-prefix">${escapeHtml(currentCommentPrefix())}</span><input class="compose-input" type="text" data-action="compose" data-id="${logo.id}" placeholder="${escapeHtml(t("writeComment"))}" autocomplete="off" />`
+                : `<div class="comment-preview-text">${escapeHtml(lastCommentPreview(review.comment))}</div>`}
+              <button class="panel-toggle" type="button" data-action="toggle-extras" data-id="${logo.id}" aria-label="Details">${review.extrasOpen ? "⇡" : "⇣"}</button>
+            </div>
+            <div class="card-messages ${review.extrasOpen ? "is-open" : ""}">
+              <div class="comments-list" data-id="${logo.id}">
+                ${renderCommentsList(review, { newestFirst: true, id: logo.id })}
+              </div>
             </div>
           </div>
         </article>
@@ -1735,19 +1823,10 @@ function renderLightboxTools(logo) {
   if (lightboxTools) {
     lightboxTools.hidden = false;
     lightboxTools.innerHTML = `
-      <div class="lightbox-bottom-row" style="width: 100%;">
+      <div class="lightbox-bottom-row">
         <div class="lightbox-tools-meta">
           <strong>${escapeHtml(logoNumberLabel(logo))}</strong>
           <span>${escapeHtml(imageCopy(logo.name || logo.source || logo.file || ""))}</span>
-        </div>
-        <div class="lightbox-comment-row">
-          <button class="comment-toggle" type="button" data-action="comment-toggle" data-id="${logo.id}">💬</button>
-          <div class="comment ${review.commentOpen || review.comment ? "is-open" : ""}">
-            <div class="comments-list" data-id="${logo.id}">
-              ${renderCommentsList(review)}
-            </div>
-            <textarea data-action="comment" data-id="${logo.id}" rows="1" placeholder="${currentCommentPrefix()} ${escapeHtml(t("writeComment"))}">${escapeHtml(commentValue(review))}</textarea>
-          </div>
         </div>
         <div class="lightbox-tool-actions">
           ${croppable ? `<button class="edit-logo" type="button" data-action="crop" data-id="${logo.id}" aria-label="Bijsnijden" ${editButtonStyle(logo)}>🪚</button>` : ""}
@@ -1756,10 +1835,29 @@ function renderLightboxTools(logo) {
           ${croppable ? `<button class="undo-card" type="button" data-action="undo" data-id="${logo.id}" ${undoDisabled}>↩️</button>` : ""}
           <button class="delete-logo ${review.deleted ? "is-restore" : ""}" type="button" data-action="delete" data-id="${logo.id}">${review.deleted ? "Herstel" : "☠️"}</button>
         </div>
+        <div class="lightbox-comment-row">
+          <button class="comment-toggle" type="button" data-action="comment-toggle" data-id="${logo.id}">💬</button>
+          ${review.commentOpen
+            ? `<div class="comment is-open">
+                 <div class="comments-list" data-id="${logo.id}">
+                   ${renderCommentsList(review, { id: logo.id })}
+                 </div>
+                 <div class="compose-row">
+                   <span class="compose-prefix">${escapeHtml(currentCommentPrefix())}</span>
+                   <input class="compose-input" type="text" data-action="compose" data-id="${logo.id}" placeholder="${escapeHtml(t("writeComment"))}" autocomplete="off" />
+                 </div>
+               </div>`
+            : (review.comment
+                ? `<div class="comment-preview-text">${escapeHtml(lastCommentPreview(review.comment))}</div>`
+                : `<div class="compose-row">
+                     <span class="compose-prefix">${escapeHtml(currentCommentPrefix())}</span>
+                     <input class="compose-input" type="text" data-action="compose" data-id="${logo.id}" placeholder="${escapeHtml(t("writeComment"))}" autocomplete="off" />
+                   </div>`)}
+        </div>
       </div>
     `;
-    const textarea = lightboxTools.querySelector("textarea");
-    if (textarea) fitTextarea(textarea);
+    const list = lightboxTools.querySelector(".comments-list");
+    if (list) list.scrollTop = list.scrollHeight;
   }
 }
 
@@ -3762,51 +3860,25 @@ gallery.addEventListener("click", async (event) => {
     const review = logoReview(logo);
     const key = logoStateKey(logo);
     if (action.dataset.action === "rating") {
-      holdRealtimeVoteSync();
-      const voterKey = currentVoterKey();
-      const voterRegistration = ensureCurrentVoterRegistered({ persist: false });
-      const requestId = (ratingRequestSerial += 1);
-      latestRatingRequest.set(key, requestId);
-      const rating = action.dataset.rating;
-      const localVotes = votesFor(review);
-      const shouldRemoveVote = action.dataset.currentVoted === "true" || localVotes[voterKey] === rating;
-      const optimisticReview = { ...review, votes: { ...localVotes } };
-      if (shouldRemoveVote) delete optimisticReview.votes[voterKey];
-      else optimisticReview.votes[voterKey] = rating;
-      delete optimisticReview.ratings;
-      delete optimisticReview.rating;
-      reviewState[key] = optimisticReview;
-      writeJson(reviewStoreKey, reviewState);
-      render();
-      refreshReviewItem(key)
-        .then(() => {
-          if (latestRatingRequest.get(key) !== requestId) return null;
-          const refreshedReview = { ...logoReview(logo) };
-          refreshedReview.votes = votesFor(refreshedReview);
-          if (shouldRemoveVote) delete refreshedReview.votes[voterKey];
-          else refreshedReview.votes[voterKey] = rating;
-          delete refreshedReview.ratings;
-          delete refreshedReview.rating;
-          reviewState[key] = refreshedReview;
-          writeJson(reviewStoreKey, reviewState);
-          const patch = { voteUpdates: { [key]: { [voterKey]: shouldRemoveVote ? null : rating } } };
-          if (voterRegistration.changed && voterRegistration.color) patch.voters = { [voterKey]: voterRegistration.color };
-          return queuePersist(patch);
-        })
-        .then((result) => {
-          if (result !== null && latestRatingRequest.get(key) === requestId) render();
-        })
-        .catch(() => {
-          schedulePersist({ voteUpdates: { [key]: { [voterKey]: shouldRemoveVote ? null : rating } } });
-        });
+      castVote(action);
+    }
+    if (action.dataset.action === "delete-message") {
+      if (deleteCommentMessage(logo, Number(action.dataset.index))) render();
+      return;
     }
     if (action.dataset.action === "delete") {
       if (logo.added) {
         if (!window.confirm(`Asset "${logo.name || logo.source || logo.id}" definitief verwijderen?`)) return;
-        deleteAddedAsset(logo, key).catch((error) => {
-          console.error("Asset delete failed", error);
-          window.alert("Asset kon niet volledig worden verwijderd.");
-        });
+        setAssetProcessing(logo.id, true);
+        deleteAddedAsset(logo, key)
+          .catch((error) => {
+            console.error("Asset delete failed", error);
+            window.alert("Asset kon niet volledig worden verwijderd.");
+          })
+          .finally(() => {
+            setAssetProcessing(logo.id, false);
+            render();
+          });
         return;
       }
       review.deleted = !review.deleted;
@@ -3825,33 +3897,16 @@ gallery.addEventListener("click", async (event) => {
       saveReviewItem(key);
       render();
     }
-    if (action.dataset.action === "comment-toggle") {
-      review.commentOpen = !review.commentOpen;
-      if (review.commentOpen && !review.comment) review.comment = `${currentCommentPrefix()} `;
-      reviewState[key] = review;
-      saveReviewItem(key);
-      render();
-      if (review.commentOpen) {
-        setTimeout(() => {
-          const textarea = gallery.querySelector(`textarea[data-id="${CSS.escape(String(logo.id))}"]`);
-          if (!textarea) return;
-          fitTextarea(textarea);
-          textarea.focus();
-          textarea.setSelectionRange(textarea.value.length, textarea.value.length);
-        }, 0);
-      }
-    }
     if (action.dataset.action === "toggle-extras") {
       review.extrasOpen = !review.extrasOpen;
       reviewState[key] = review;
       saveReviewItem(key);
-      const card = action.closest(".logo-card");
-      if (card) {
-        const panel = card.querySelector(".extras-panel");
-        if (panel) {
-          panel.classList.toggle("is-open", review.extrasOpen);
-        }
-        action.textContent = review.extrasOpen ? "⇣" : "⇡";
+      render();
+      if (review.extrasOpen) {
+        setTimeout(() => {
+          const input = gallery.querySelector(`.compose-input[data-id="${CSS.escape(String(logo.id))}"]`);
+          if (input) input.focus();
+        }, 0);
       }
     }
     if (action.dataset.action === "undo" && undoLogoCrop(logo)) {
@@ -3920,6 +3975,15 @@ lightboxDialog.addEventListener("click", (event) => {
 });
 lightboxPrev.addEventListener("click", () => navigateLightbox(-1));
 lightboxNext.addEventListener("click", () => navigateLightbox(1));
+
+const lightboxRatingContainerEl = document.getElementById("lightboxRatingContainer");
+if (lightboxRatingContainerEl) {
+  lightboxRatingContainerEl.addEventListener("click", (event) => {
+    const action = event.target.closest('[data-action="rating"]');
+    if (action) castVote(action);
+  });
+}
+
 lightboxTools.addEventListener("click", async (event) => {
   const action = event.target.closest("[data-action]");
   if (!action) return;
@@ -3928,63 +3992,24 @@ lightboxTools.addEventListener("click", async (event) => {
   const review = logoReview(logo);
   const key = logoStateKey(logo);
   if (action.dataset.action === "rating") {
-    holdRealtimeVoteSync();
-    const voterKey = currentVoterKey();
-    const voterRegistration = ensureCurrentVoterRegistered({ persist: false });
-    const requestId = (ratingRequestSerial += 1);
-    latestRatingRequest.set(key, requestId);
-    const rating = action.dataset.rating;
-    const localVotes = votesFor(review);
-    const shouldRemoveVote = action.dataset.currentVoted === "true" || localVotes[voterKey] === rating;
-    const optimisticReview = { ...review, votes: { ...localVotes } };
-    if (shouldRemoveVote) delete optimisticReview.votes[voterKey];
-    else optimisticReview.votes[voterKey] = rating;
-    delete optimisticReview.ratings;
-    delete optimisticReview.rating;
-    reviewState[key] = optimisticReview;
-    writeJson(reviewStoreKey, reviewState);
-    render();
-    renderLightboxTools(logo);
-    refreshReviewItem(key)
-      .then(() => {
-        if (latestRatingRequest.get(key) !== requestId) return null;
-        const refreshedReview = { ...logoReview(logo) };
-        refreshedReview.votes = votesFor(refreshedReview);
-        if (shouldRemoveVote) delete refreshedReview.votes[voterKey];
-        else refreshedReview.votes[voterKey] = rating;
-        delete refreshedReview.ratings;
-        delete refreshedReview.rating;
-        reviewState[key] = refreshedReview;
-        writeJson(reviewStoreKey, reviewState);
-        const patch = { voteUpdates: { [key]: { [voterKey]: shouldRemoveVote ? null : rating } } };
-        if (voterRegistration.changed && voterRegistration.color) patch.voters = { [voterKey]: voterRegistration.color };
-        return queuePersist(patch);
-      })
-      .then((result) => {
-        if (result !== null && latestRatingRequest.get(key) === requestId) {
-          render();
-          renderLightboxTools(logo);
-        }
-      })
-      .catch(() => {
-        schedulePersist({ voteUpdates: { [key]: { [voterKey]: shouldRemoveVote ? null : rating } } });
-      });
+    castVote(action);
     return;
   }
   if (action.dataset.action === "comment-toggle") {
     review.commentOpen = !review.commentOpen;
-    if (review.commentOpen && !review.comment) review.comment = `${currentCommentPrefix()} `;
     reviewState[key] = review;
     saveReviewItem(key);
-    render();
     renderLightboxTools(logo);
     if (review.commentOpen) {
-      const textarea = lightboxTools.querySelector(`textarea[data-id="${CSS.escape(String(logo.id))}"]`);
-      if (textarea) {
-        fitTextarea(textarea);
-        textarea.focus();
-        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
-      }
+      const input = lightboxTools.querySelector(`.compose-input[data-id="${CSS.escape(String(logo.id))}"]`);
+      if (input) input.focus();
+    }
+    return;
+  }
+  if (action.dataset.action === "delete-message") {
+    if (deleteCommentMessage(logo, Number(action.dataset.index))) {
+      render();
+      renderLightboxTools(logo);
     }
     return;
   }
@@ -4032,6 +4057,20 @@ lightboxTools.addEventListener("input", (event) => {
   if (!control) return;
   updateCommentFromControl(control);
 });
+lightboxTools.addEventListener("keydown", (event) => {
+  const control = event.target.closest('.compose-input[data-action="compose"]');
+  if (!control) return;
+  event.stopPropagation();
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    const result = appendComposedMessage(control);
+    if (!result) return;
+    render();
+    renderLightboxTools(result.logo);
+    const input = lightboxTools.querySelector(`.compose-input[data-id="${CSS.escape(String(result.logo.id))}"]`);
+    if (input) input.focus();
+  }
+});
 lightboxImage.addEventListener("pointerdown", (event) => {
   if (lightboxImage.hidden) return;
   lightboxImage.setPointerCapture(event.pointerId);
@@ -4075,6 +4114,21 @@ gallery.addEventListener("input", (event) => {
   const control = event.target.closest('[data-action="comment"]');
   if (!control) return;
   updateCommentFromControl(control);
+});
+
+gallery.addEventListener("keydown", (event) => {
+  const control = event.target.closest('.compose-input[data-action="compose"]');
+  if (!control) return;
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    const result = appendComposedMessage(control);
+    if (!result) return;
+    render();
+    setTimeout(() => {
+      const input = gallery.querySelector(`.compose-input[data-id="${CSS.escape(String(result.logo.id))}"]`);
+      if (input) input.focus();
+    }, 0);
+  }
 });
 
 gallery.addEventListener("click", (event) => {
@@ -4563,6 +4617,15 @@ async function batchRemoveTag() {
   clearSelection();
 }
 
+// Toggle the "processing" overlay on a specific card instantly (no full re-render).
+function setAssetProcessing(id, on) {
+  const sid = String(id);
+  if (on) processingAssetIds.add(sid);
+  else processingAssetIds.delete(sid);
+  const card = gallery.querySelector(`.logo-card[data-id="${CSS.escape(sid)}"]`);
+  if (card) card.classList.toggle("is-processing", on);
+}
+
 async function batchDeleteAssets() {
   if (selectedAssetIds.size === 0) return;
   const confirmMessage = activeLanguage === "nl"
@@ -4575,53 +4638,57 @@ async function batchDeleteAssets() {
 
   const addedIds = [];
   const defaultKeys = [];
-  
+
   idsToDelete.forEach((id) => {
     const logo = findLogo(id);
     if (!logo) return;
     if (logo.added) {
-      addedIds.push({ logo, key: logoStateKey(logo) });
+      addedIds.push({ logo, key: logoStateKey(logo), id: String(logo.id) });
     } else {
       defaultKeys.push(logoStateKey(logo));
     }
   });
 
-  const reviewPatch = {};
-  defaultKeys.forEach((key) => {
-    const review = reviewState[key] || {};
-    review.deleted = true;
-    reviewState[key] = review;
-    reviewPatch[key] = review;
-  });
+  // Default assets: mark deleted instantly (debounced persist) — they vanish on the next render.
   if (defaultKeys.length > 0) {
+    const reviewPatch = {};
+    defaultKeys.forEach((key) => {
+      const review = reviewState[key] || {};
+      review.deleted = true;
+      reviewState[key] = review;
+      reviewPatch[key] = review;
+    });
     writeJson(reviewStoreKey, reviewState);
     schedulePersist({ review: reviewPatch });
   }
 
+  // Show the processing overlay on the uploaded assets immediately, then delete them in the background.
+  addedIds.forEach(({ id }) => processingAssetIds.add(id));
+  render();
+
   if (addedIds.length > 0) {
-    try {
-      await Promise.all(addedIds.map(async ({ logo, key }) => {
+    await persistQueue.catch(() => {});
+    const results = await Promise.allSettled(
+      addedIds.map(async ({ key }) => {
         const response = await fetch(`/api/state?project=${encodeURIComponent(activeProjectId)}&asset=${encodeURIComponent(key)}`, {
           method: "DELETE",
-          headers: {
-            "x-project-id": activeProjectId,
-            "x-asset-id": key
-          }
+          headers: { "x-project-id": activeProjectId, "x-asset-id": key }
         });
         if (!response.ok) throw new Error(await response.text());
         removeLocalAddedAsset(key);
-      }));
-    } catch (error) {
-      console.error("Batch delete failed", error);
+      })
+    );
+    addedIds.forEach(({ id }) => processingAssetIds.delete(id));
+    if (results.some((r) => r.status === "rejected")) {
+      console.error("Batch delete: some assets failed", results.filter((r) => r.status === "rejected"));
       window.alert(
         activeLanguage === "nl"
           ? "Sommige geselecteerde assets konden niet volledig worden verwijderd."
           : "Some selected assets could not be completely deleted."
       );
     }
+    render();
   }
-
-  render();
 }
 
 // Bind Batch Bar Action Listeners

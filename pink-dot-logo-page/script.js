@@ -633,15 +633,12 @@ function imageCopy(value) {
 
 function optimizedImageUrl(url, width = 384, quality = 75) {
   if (!url) return "";
-  if (url.startsWith("data:")) return url;
-  if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-    return url;
-  }
-  let absoluteUrl = url;
-  if (url.startsWith("/")) {
-    absoluteUrl = window.location.origin + url;
-  }
-  return `/_vercel/image?url=${encodeURIComponent(absoluteUrl)}&w=${width}&q=${quality}`;
+  // NOTE: Vercel Image Optimization (/_vercel/image) is not available on this
+  // project — that endpoint returns 404, which left every gallery thumbnail
+  // (and all uploaded blob assets) broken. Serve the source image directly.
+  // Re-enable optimization only after configuring it (and images.remotePatterns
+  // for *.public.blob.vercel-storage.com) and verifying /_vercel/image works.
+  return url;
 }
 
 function imageSource(logo, options = {}) {

@@ -393,9 +393,8 @@ body > div {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   grid-template-areas:
-    "title title title"
-    ". votes actions";
-  align-items: end;
+    "title votes actions";
+  align-items: center;
   gap: 12px 22px;
   padding: 18px clamp(16px, 4vw, 48px);
   border-bottom: 1px solid var(--line);
@@ -519,11 +518,19 @@ h1 {
 .top-actions {
   grid-area: actions;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: wrap;
   max-width: none;
-  align-items: flex-end;
+  align-items: center;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* On wide screens the voter circles + action buttons sit on one row next to the
+   title, scaled to 80%. Reset to full size + stacked layout below 1320px. */
+.vote-filters,
+.top-actions {
+  zoom: 0.8;
 }
 
 .top-actions-layer {
@@ -1578,10 +1585,17 @@ main {
     grid-template-areas:
       "title title title"
       ". votes actions";
+    align-items: end;
   }
 
   .top-actions {
+    flex-direction: column;
     flex-wrap: wrap;
+  }
+
+  .vote-filters,
+  .top-actions {
+    zoom: 1;
   }
 }
 
